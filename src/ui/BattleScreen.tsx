@@ -340,8 +340,41 @@ export function BattleScreen({ families, variant, cpu, onFinish, onQuit }: Props
   const clearGhost = useCallback(() => setGhost(null), []);
 
   // ---- 操作 ----
+  /** 動かせない駒を押したときに、なぜ動かせないかを短く知らせる */
+  const notice = (text: string) => {
+    play('tap');
+    setToast({ key: ++seq, label: 'うごけない', text });
+  };
+  const whyCannotMove = (piece: Piece): string => {
+    if (piece.owner !== game.turn) return 'あいての駒は うごかせないよ';
+    const name = piece.name;
+    switch (phaseType) {
+      case 'shoot':
+        return '撃てるのは 光っている足軽だけだよ';
+      case 'pull':
+        return phase?.step === 1 ? 'ひきよせるのは 光っている あいての駒だよ' : `${name}は いま うごけないよ`;
+      case 'drop2':
+        return 'いまは もちごまを 打つ番だよ';
+      case 'double':
+        return piece.kind === 'K' ? '風林火山では 大将は うごかせないよ' : `${name}は いま うごけないよ`;
+      case 'kingDouble':
+        return piece.kind !== 'K' ? '毘沙門天の加護で うごかせるのは 大将だけだよ' : `${name}は いま うごけないよ`;
+      case 'arrows':
+        if (piece.kind === 'K') return '三本の矢では 大将は すすめられないよ';
+        if (phase?.moved.includes(piece.id)) return `${name}は もう すすめたよ`;
+        return `${name}の 前が ふさがっているよ`;
+      case 'slideDiag':
+        return piece.kind === 'K' ? '独眼竜では 大将は うごかせないよ' : `${name}は いま うごけないよ`;
+      case 'yukimura':
+        return '六文銭で うごかせるのは 真田幸村だけだよ';
+      default:
+        return game.forbidden ? `${name}は いま うごけないよ (さっきと おなじ手は 指せない)` : `${name}は いま うごけないよ`;
+    }
+  };
+
   const onCell = (pos: Pos) => {
     if (over || isCpuTurn || performance.now() < busyUntil.current) return;
+    const tapped = pieceAt(game, pos);
     if (phaseType === 'spawn') {
       if (isTarget(pos)) dispatch({ type: 'spawn', to: pos });
       return;
@@ -355,20 +388,24 @@ export function BattleScreen({ families, variant, cpu, onFinish, onQuit }: Props
         play('select');
         return setSel({ type: 'board', pos });
       }
-      return setSel(null);
+      setSel(null);
+      // 鉄砲なら自分の駒、釣り野伏せなら相手の駒が対象なので、それ以外を押したら知らせる
+      if (tapped && (phaseType === 'shoot' ? tapped.owner === game.turn : true)) notice(whyCannotMove(tapped));
+      return;
     }
     if (sel && isTarget(pos)) {
       return sel.type === 'board'
         ? dispatch({ type: 'move', from: sel.pos, to: pos })
         : dispatch({ type: 'drop', pieceId: sel.pieceId, to: pos });
     }
-    const piece = pieceAt(game, pos);
-    if (piece && piece.owner === game.turn && legalMoves(game, pos).length > 0) {
+    if (tapped && tapped.owner === game.turn && legalMoves(game, pos).length > 0) {
       if (sel?.type === 'board' && samePos(sel.pos, pos)) return setSel(null);
       play('select');
       return setSel({ type: 'board', pos });
     }
     setSel(null);
+    // 駒を選んでいないときに、動かせない駒を押したら理由を出す (選んでいるときは「選びなおし」なので出さない)
+    if (tapped && !sel) notice(whyCannotMove(tapped));
   };
 
   const handEnabled = (side: Side) => !over && !isCpuSide(side) && side === game.turn && (!phase || phaseType === 'drop2');
