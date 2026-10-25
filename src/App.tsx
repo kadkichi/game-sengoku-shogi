@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { FamilyId } from './data/families';
 import type { Side, Variant } from './engine/types';
+import type { CpuSetting } from './ai/cpu';
 import { BattleScreen, type BattleResult } from './ui/BattleScreen';
 import { CharacterSheet } from './ui/CharacterSheet';
 import { ResultScreen } from './ui/ResultScreen';
@@ -18,6 +19,7 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>({ name: 'title' });
   const [families, setFamilies] = useState<Record<Side, FamilyId>>({ sente: 'oda', gote: 'uesugi' });
   const [variant, setVariant] = useState<Variant>('small');
+  const [cpu, setCpu] = useState<CpuSetting | null>(null);
   const [round, setRound] = useState(0);
 
   const startBattle = () => {
@@ -40,10 +42,12 @@ export default function App() {
         <SelectScreen
           initial={families}
           initialVariant={variant}
+          initialCpu={cpu}
           onBack={() => setScreen({ name: 'title' })}
-          onStart={(f, v) => {
+          onStart={(f, v, c) => {
             setFamilies(f);
             setVariant(v);
+            setCpu(c);
             startBattle();
           }}
         />
@@ -53,6 +57,7 @@ export default function App() {
           key={screen.round}
           families={families}
           variant={variant}
+          cpu={cpu}
           onFinish={(result) => setScreen({ name: 'result', result })}
           onQuit={() => setScreen({ name: 'title' })}
         />
@@ -60,6 +65,7 @@ export default function App() {
       {screen.name === 'result' && (
         <ResultScreen
           result={screen.result}
+          cpu={cpu}
           onRematch={startBattle}
           onReselect={() => setScreen({ name: 'select' })}
           onTitle={() => setScreen({ name: 'title' })}

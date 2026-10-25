@@ -2,7 +2,7 @@
  * 効果音。Web Audio で合成するので音声ファイルは不要。
  * 差し替えるときは play() の中身を audio 要素の再生に変えればよい。
  */
-export type SoundName = 'select' | 'move' | 'capture' | 'promote' | 'skill' | 'shoot' | 'danger' | 'win' | 'draw' | 'tap';
+export type SoundName = 'select' | 'move' | 'capture' | 'clash' | 'promote' | 'skill' | 'shoot' | 'danger' | 'win' | 'draw' | 'tap';
 
 let ctx: AudioContext | null = null;
 let muted = false;
@@ -83,6 +83,13 @@ export function play(name: SoundName) {
       thump(ac, t, 180, 0.14, 0.5);
       tone(ac, 523, t + 0.08, 0.12);
       tone(ac, 784, t + 0.18, 0.2);
+      break;
+    case 'clash':
+      // 刀がぶつかる「カキン」: 高い金属音を重ねて、短いノイズを添える
+      noise(ac, t, 0.06, 0.35);
+      [2093, 2637, 3136].forEach((f, i) => tone(ac, f, t + i * 0.01, 0.35 - i * 0.08, 'triangle', 0.09));
+      tone(ac, 1568, t + 0.12, 0.25, 'square', 0.03);
+      thump(ac, t + 0.02, 160, 0.12, 0.35);
       break;
     case 'promote':
       [523, 659, 784, 1047].forEach((f, i) => tone(ac, f, t + i * 0.07, 0.22, 'triangle', 0.16));

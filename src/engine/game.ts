@@ -235,6 +235,11 @@ export function legalMoves(state: GameState, from: Pos): Pos[] {
         moves = inBounds(state, to) && !pieceAt(state, to) ? [to] : [];
         break;
       }
+      case 'pull':
+        // 釣り野伏せ: 引き寄せたあとに、自分の駒を1回ふつうに動かせる
+        if (phase.step < 2) return [];
+        moves = pseudoMoves(state, from);
+        break;
       case 'slideDiag':
         if (piece.kind === 'K') return [];
         moves = slide(state, from, DIAGONALS);
@@ -443,14 +448,16 @@ export function applyAction(prev: GameState, action: Action): GameState {
       return state;
     }
     case 'pull': {
-      if (phase?.type !== 'pull') fail('not pulling');
+      if (phase?.type !== 'pull' || phase.step !== 1) fail('not pulling');
       if (!pullTargets(state, action.from).some((p) => samePos(p, action.to))) fail('illegal pull');
       commit();
       const piece = state.board[action.from.y][action.from.x] as Piece;
       state.board[action.from.y][action.from.x] = null;
       state.board[action.to.y][action.to.x] = piece;
       state.events.push({ type: 'pull', side, piece: { ...piece }, from: action.from, to: action.to });
-      endTurn(state);
+      // 引き寄せたら、続けて自分の駒を1回動かせる (動かさずに終えてもよい)
+      state.skillPhase = { type: 'pull', step: 2, moved: [] };
+      if (!hasAnySkillMove(state)) endTurn(state);
       return state;
     }
     case 'spawn': {
@@ -573,6 +580,11 @@ function endTurn(state: GameState) {
   if (state.positions.filter((k) => k === key).length >= 3) {
     state.draw = true;
     state.events.push({ type: 'draw' } satisfies GameEvent);
+    return;
+  }
+  if (state.search) {
+    state.lastTurnStart = null;
+    state.thisTurnStart = null;
     return;
   }
   state.lastTurnStart = state.thisTurnStart;

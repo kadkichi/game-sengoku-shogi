@@ -196,6 +196,33 @@ describe('島津家 釣り野伏せ', () => {
     expect(pullSources(s)).toEqual([P(2, 1)]);
     s = applyAction(s, { type: 'pull', from: P(2, 1), to: P(2, 2) });
     expect(pieceAt(s, P(2, 2))?.owner).toBe('gote');
+    // 引き寄せたあとも先手の番が続き、自分の駒を動かせる
+    expect(s.turn).toBe('sente');
+    expect(s.skillPhase).toMatchObject({ type: 'pull', step: 2 });
+  });
+
+  it('引き寄せたあと、自分の駒で その駒を取れる', () => {
+    let s = custom(
+      [...kings(), [P(2, 1), piece('gote', 'G')], [P(2, 3), piece('sente', 'G')]],
+      { sente: 'shimazu', gote: 'oda' },
+    );
+    s = applyAction(s, { type: 'activateSkill' });
+    s = applyAction(s, { type: 'pull', from: P(2, 1), to: P(2, 2) });
+    s = applyAction(s, { type: 'move', from: P(2, 3), to: P(2, 2) });
+    expect(s.hands.sente).toHaveLength(1);
+    expect(s.turn).toBe('gote');
+    expect(s.moveCount).toBe(1);
+  });
+
+  it('引き寄せたあと、動かさずに終えてもよい。引き寄せは2回できない', () => {
+    let s = custom(
+      [...kings(), [P(2, 1), piece('gote', 'G')], [P(1, 1), piece('gote', 'S')]],
+      { sente: 'shimazu', gote: 'oda' },
+    );
+    s = applyAction(s, { type: 'activateSkill' });
+    s = applyAction(s, { type: 'pull', from: P(2, 1), to: P(2, 2) });
+    expect(() => applyAction(s, { type: 'pull', from: P(1, 1), to: P(1, 2) })).toThrow(IllegalAction);
+    s = applyAction(s, { type: 'endSkill' });
     expect(s.turn).toBe('gote');
   });
 });

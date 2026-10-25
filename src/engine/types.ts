@@ -94,4 +94,9 @@ export interface GameState {
   positions: string[];
   /** 直前の操作で起きたこと (演出用) */
   events: GameEvent[];
+  /**
+   * CPU の読みの途中の局面。true のあいだは「鳴くまで待とう」用の局面の保存を省いて速くする
+   * (読みの先では、徳川の技は使えない扱いになる)
+   */
+  search?: boolean;
 }

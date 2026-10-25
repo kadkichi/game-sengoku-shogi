@@ -5,13 +5,17 @@ import type { Side, Variant } from '../engine/types';
 import { play } from '../audio/sound';
 import { Chara } from './Chara';
 import { useStage } from './Stage';
+import { LEVEL_LABEL, type CpuLevel, type CpuSetting } from '../ai/cpu';
 
 interface Props {
   initial: Record<Side, FamilyId>;
   initialVariant: Variant;
+  initialCpu: CpuSetting | null;
   onBack: () => void;
-  onStart: (families: Record<Side, FamilyId>, variant: Variant) => void;
+  onStart: (families: Record<Side, FamilyId>, variant: Variant, cpu: CpuSetting | null) => void;
 }
+
+const other = (s: Side): Side => (s === 'sente' ? 'gote' : 'sente');
 
 const SIDE_NAME: Record<Side, string> = { sente: '先手', gote: '後手' };
 const SIDE_SUB: Record<Side, string> = { sente: 'さきに うごく', gote: 'あとから うごく' };
@@ -23,11 +27,18 @@ const iconPos = (id: FamilyId, compact: boolean): [number, number] => {
   return compact ? [x, Math.max(125, Math.min(y, 585))] : [x, y];
 };
 
-export function SelectScreen({ initial, initialVariant, onBack, onStart }: Props) {
+export function SelectScreen({ initial, initialVariant, initialCpu, onBack, onStart }: Props) {
   const [picked, setPicked] = useState(initial);
   const [variant, setVariant] = useState<Variant>(initialVariant);
   /** いま地図で選んでいる側 */
   const [active, setActive] = useState<Side>('sente');
+  /** 対戦相手: ふたりで遊ぶか、CPU (よわい・ふつう) か */
+  const [opponentKind, setOpponentKind] = useState<'human' | CpuLevel>(initialCpu?.level ?? 'human');
+  /** CPU と遊ぶとき、自分が指す側 */
+  const [humanSide, setHumanSide] = useState<Side>(initialCpu ? other(initialCpu.side) : 'sente');
+  const cpu: CpuSetting | null = opponentKind === 'human' ? null : { side: other(humanSide), level: opponentKind };
+  /** 「先手」「後手」に、CPU と遊ぶときは「あなた」「CPU」を添える */
+  const who = (s: Side) => (cpu ? (cpu.side === s ? 'CPU' : 'あなた') : null);
   const { compact, h } = useStage();
   const topH = compact ? 56 : 68;
   const pad = compact ? 12 : 16;
@@ -111,7 +122,7 @@ export function SelectScreen({ initial, initialVariant, onBack, onStart }: Props
             }}
           >
             <span style={{ width: 14, height: 14, borderRadius: 7, background: SIDE_COLOR[active] }} />
-            <span style={{ fontSize: compact ? 23 : 17, fontWeight: 800 }}>{SIDE_NAME[active]}の 大名を えらんでね</span>
+            <span style={{ fontSize: compact ? 23 : 17, fontWeight: 800 }}>{who(active) ? `${who(active)} (${SIDE_NAME[active]})` : SIDE_NAME[active]}の 大名を えらんでね</span>
             <button className="btn btn-ghost" style={{ height: compact ? 46 : 34, fontSize: compact ? 19 : 13, padding: '0 14px' }} onClick={pickRandom}>
               おまかせ
             </button>
@@ -159,6 +170,7 @@ export function SelectScreen({ initial, initialVariant, onBack, onStart }: Props
                     {sides.map((s) => (
                       <span key={s} className="map-badge" style={{ background: SIDE_COLOR[s] }}>
                         {SIDE_NAME[s]}
+                        {who(s) === 'CPU' ? ' CPU' : ''}
                       </span>
                     ))}
                   </span>
@@ -170,33 +182,12 @@ export function SelectScreen({ initial, initialVariant, onBack, onStart }: Props
         </div>
 
         {/* 右: 選んだ大名 */}
-        <aside style={{ flex: '1 1 auto', display: 'flex', flexDirection: 'column', gap: compact ? 10 : 12, minWidth: 0 }}>
-          <div role="radiogroup" aria-label="いま えらんでいる 側" className="segment">
-            {(['sente', 'gote'] as Side[]).map((side) => {
-              const on = active === side;
-              return (
-                <button
-                  key={side}
-                  role="radio"
-                  aria-checked={on}
-                  className="btn"
-                  onClick={() => {
-                    play('tap');
-                    setActive(side);
-                  }}
-                  style={{ flex: '1 1 0', height: 44, borderRadius: 20, fontSize: compact ? 18 : 16, background: on ? SIDE_COLOR[side] : 'transparent', color: on ? '#fff' : SIDE_COLOR[side] }}
-                >
-                  {SIDE_NAME[side]}を えらぶ
-                </button>
-              );
-            })}
-          </div>
-
+        <aside style={{ flex: '1 1 auto', display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 }}>
           <div style={compact ? { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 } : { display: 'flex', flexDirection: 'column', gap: 12 }}>
           {(['sente', 'gote'] as Side[]).map((side) => {
             const f = FAMILIES[picked[side]];
             const on = active === side;
-            const face = compact ? 64 : 84;
+            const face = compact ? 64 : 76;
             return (
               <button
                 key={side}
@@ -212,6 +203,11 @@ export function SelectScreen({ initial, initialVariant, onBack, onStart }: Props
                   <span style={{ display: 'inline-flex', alignItems: 'center', height: 28, padding: '0 12px', borderRadius: 14, fontSize: 15, fontWeight: 800, color: '#fff', background: SIDE_COLOR[side] }}>
                     {SIDE_NAME[side]}
                   </span>
+                  {who(side) && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', height: 26, padding: '0 10px', borderRadius: 13, fontSize: 14, fontWeight: 800, color: SIDE_COLOR[side], border: `2px solid ${SIDE_COLOR[side]}` }}>
+                      {who(side)}
+                    </span>
+                  )}
                   {!compact && <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--muted)' }}>{on ? '地図で えらんでいるよ' : SIDE_SUB[side]}</span>}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: compact ? 8 : 14 }}>
@@ -254,7 +250,7 @@ export function SelectScreen({ initial, initialVariant, onBack, onStart }: Props
                     setVariant(v);
                   }}
                   style={{
-                    flex: '1 1 0', height: 50, borderRadius: 20, flexDirection: 'column', gap: 0, lineHeight: 1.15,
+                    flex: '1 1 0', height: compact ? 46 : 44, borderRadius: 20, flexDirection: 'column', gap: 0, lineHeight: 1.15,
                     background: on ? 'var(--blue)' : 'transparent', color: on ? '#fff' : 'var(--blue)',
                   }}
                 >
@@ -267,12 +263,60 @@ export function SelectScreen({ initial, initialVariant, onBack, onStart }: Props
             })}
           </div>
 
+          <div role="radiogroup" aria-label="あいて" className="segment">
+            {(['human', 'weak', 'normal'] as const).map((k) => {
+              const on = opponentKind === k;
+              return (
+                <button
+                  key={k}
+                  role="radio"
+                  aria-checked={on}
+                  className="btn"
+                  onClick={() => {
+                    play('select');
+                    setOpponentKind(k);
+                  }}
+                  style={{
+                    flex: '1 1 0', height: compact ? 46 : 44, borderRadius: 20, flexDirection: 'column', gap: 0, lineHeight: 1.15,
+                    background: on ? '#6b3fa0' : 'transparent', color: on ? '#fff' : '#5b3290',
+                  }}
+                >
+                  <span style={{ fontSize: compact ? 18 : 16 }}>{k === 'human' ? 'ふたりで' : `CPU ${LEVEL_LABEL[k]}`}</span>
+                  {!compact && <span style={{ fontSize: 11, fontWeight: 700 }}>{k === 'human' ? 'おなじ たんまつで' : 'ひとりで あそぶ'}</span>}
+                </button>
+              );
+            })}
+          </div>
+
+          {cpu && (
+            <div role="radiogroup" aria-label="あなたが 指す側" className="segment">
+              {(['sente', 'gote'] as Side[]).map((s) => {
+                const on = humanSide === s;
+                return (
+                  <button
+                    key={s}
+                    role="radio"
+                    aria-checked={on}
+                    className="btn"
+                    onClick={() => {
+                      play('select');
+                      setHumanSide(s);
+                    }}
+                    style={{ flex: '1 1 0', height: compact ? 44 : 40, borderRadius: 20, fontSize: compact ? 18 : 16, background: on ? SIDE_COLOR[s] : 'transparent', color: on ? '#fff' : SIDE_COLOR[s] }}
+                  >
+                    あなたが {SIDE_NAME[s]}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           <button
             className="btn btn-primary"
-            style={{ marginTop: 'auto', height: compact ? 60 : 68, borderRadius: 34, fontSize: compact ? 28 : 30, letterSpacing: '0.15em', paddingLeft: '0.15em' }}
+            style={{ marginTop: 'auto', flex: '0 0 auto', height: compact ? 60 : 62, borderRadius: 34, fontSize: compact ? 28 : 30, letterSpacing: '0.15em', paddingLeft: '0.15em' }}
             onClick={() => {
               play('skill');
-              onStart(picked, variant);
+              onStart(picked, variant, cpu);
             }}
           >
             かいせん!

@@ -22,8 +22,11 @@ import {
 import type { Action, GameState, Piece, Pos, Side, Variant, WinReason } from '../engine/types';
 import { isMuted, play, setMuted, type SoundName } from '../audio/sound';
 import { Chara, specialOf } from './Chara';
-import { PieceTile } from './PieceTile';
+import { DirArrows, PieceTile, type Motion } from './PieceTile';
+import { Clash } from './Clash';
 import { useStage } from './Stage';
+import { think } from '../ai/think';
+import { LEVEL_LABEL, type CpuSetting } from '../ai/cpu';
 
 export interface BattleResult {
   winner: Side | null;
@@ -42,6 +45,8 @@ const MOVE_SKILLS = new Set(['double', 'kingDouble', 'arrows', 'slideDiag', 'yuk
 interface Props {
   families: Record<Side, FamilyId>;
   variant: Variant;
+  /** CPU と対戦するときの設定。null なら2人で遊ぶ */
+  cpu: CpuSetting | null;
   onFinish: (result: BattleResult) => void;
   onQuit: () => void;
 }
@@ -64,13 +69,28 @@ interface Ghost {
 
 let seq = 0;
 
-export function BattleScreen({ families, variant, onFinish, onQuit }: Props) {
+/** CPU の操作と操作のあいだの間 (ms) */
+const CPU_MIN_THINK = 700;
+const CPU_STEP = 650;
+const CPU_AFTER_SKILL = 1500;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+export function BattleScreen({ families, variant, cpu, onFinish, onQuit }: Props) {
   const [game, setGame] = useState<GameState>(() => createGame(families, variant));
+  /** CPU が続けて操作するとき、最新の局面を読むために使う */
+  const gameRef = useRef(game);
+  gameRef.current = game;
   const [sel, setSel] = useState<Selection>(null);
   const [toast, setToast] = useState<Toast | null>(null);
   const [banner, setBanner] = useState<{ key: number; family: FamilyId } | null>(null);
   const [ghost, setGhost] = useState<Ghost | null>(null);
-  const [justMoved, setJustMoved] = useState<string | null>(null);
+  /** 動いた駒の動き (駒の id ごと) */
+  const [motions, setMotions] = useState<Record<string, Motion>>({});
+  /** 取られる途中の駒 (ゆれてから消える) と、ぶつかったところの砂埃・刀 */
+  const [defenders, setDefenders] = useState<{ key: number; piece: Piece; family: FamilyId; at: Pos }[]>([]);
+  const [clashes, setClashes] = useState<{ key: number; x: number; y: number; kind: 'battle' | 'shot' }[]>([]);
+  /** 戦闘のアニメーション中は、次の操作を受け付けない */
+  const busyUntil = useRef(0);
   const [justPromoted, setJustPromoted] = useState<string | null>(null);
   const [muted, setMutedState] = useState(isMuted());
   const [confirmQuit, setConfirmQuit] = useState(false);
@@ -92,8 +112,8 @@ export function BattleScreen({ families, variant, onFinish, onQuit }: Props) {
   const sources = useMemo<Pos[]>(() => {
     if (!phaseType) return [];
     if (phaseType === 'shoot') return shooters(game);
-    if (phaseType === 'pull') return pullSources(game);
-    if (MOVE_SKILLS.has(phaseType)) {
+    if (phaseType === 'pull' && phase?.step === 1) return pullSources(game);
+    if (MOVE_SKILLS.has(phaseType) || phaseType === 'pull') {
       const out: Pos[] = [];
       game.board.forEach((row, y) =>
         row.forEach((p, x) => {
@@ -110,7 +130,7 @@ export function BattleScreen({ families, variant, onFinish, onQuit }: Props) {
     if (!sel) return [];
     if (sel.type === 'hand') return legalDrops(game, sel.pieceId);
     if (phaseType === 'shoot') return shootTargets(game, sel.pos);
-    if (phaseType === 'pull') return pullTargets(game, sel.pos);
+    if (phaseType === 'pull' && phase?.step === 1) return pullTargets(game, sel.pos);
     return legalMoves(game, sel.pos);
   }, [game, sel, phaseType]);
   const isTarget = (p: Pos) => targets.some((t) => samePos(t, p));
@@ -152,6 +172,7 @@ export function BattleScreen({ families, variant, onFinish, onQuit }: Props) {
   );
 
   const dispatch = (action: Action) => {
+    const game = gameRef.current;
     let next: GameState;
     try {
       next = applyAction(game, action);
@@ -164,43 +185,92 @@ export function BattleScreen({ families, variant, onFinish, onQuit }: Props) {
     let sound: SoundName | null = null;
     const say = (label: string, text: string) => setToast({ key: ++seq, label, text });
 
+    const later = (ms: number, fn: () => void) => setTimeout(fn, ms);
+    const animate = (id: string, m: Omit<Motion, 'key'>) => {
+      const key = ++seq;
+      setMotions((cur) => ({ ...cur, [id]: { ...m, key } }));
+      later(1300, () => setMotions((cur) => (cur[id]?.key === key ? (({ [id]: _drop, ...rest }) => rest)(cur) : cur)));
+    };
+    const showDefender = (piece: Piece, at: Pos) => {
+      const key = ++seq;
+      setDefenders((cur) => [...cur, { key, piece, family: game.families[piece.owner], at }]);
+      later(900, () => setDefenders((cur) => cur.filter((d) => d.key !== key)));
+    };
+    const showClash = (x: number, y: number, kind: 'battle' | 'shot') => {
+      const key = ++seq;
+      setClashes((cur) => [...cur, { key, x, y, kind }]);
+      later(1200, () => setClashes((cur) => cur.filter((c) => c.key !== key)));
+    };
+    const captures = next.events.filter((e) => e.type === 'capture');
+    const captureAt = (p: Pos) => captures.find((c) => c.type === 'capture' && samePos(c.at, p));
+    /** この操作のアニメーションが終わるまでの目安 (ms)。CPU が次の操作をするまで待つのに使う */
+    let busy = 350;
+
     for (const ev of next.events) {
       switch (ev.type) {
-        case 'move':
+        case 'move': {
+          const cap = captureAt(ev.to);
+          const battle = cap?.type === 'capture' && cap.by === 'move';
+          const fx = (ev.from.x - ev.to.x) * cell;
+          const fy = (ev.from.y - ev.to.y) * cell;
+          animate(ev.pieceId, { kind: battle ? 'battle' : 'slide', fx, fy });
+          if (battle && cap?.type === 'capture') {
+            // 2つのマスの境目でぶつかる
+            showClash((ev.to.x + 0.5) * cell + fx / 2, (ev.to.y + 0.5) * cell + fy / 2, 'battle');
+            showDefender(cap.piece, ev.to);
+            later(270, () => play('clash'));
+            later(720, () => play('capture'));
+            busy = 1200;
+          } else {
+            sound ??= 'move';
+          }
+          break;
+        }
         case 'drop':
         case 'spawn':
-          setJustMoved(ev.pieceId);
+          animate(ev.pieceId, { kind: 'drop', fx: 0, fy: 0 });
           sound ??= 'move';
           if (ev.type === 'spawn') say('一領具足!', '新しい 足軽が 出陣した');
           break;
         case 'pull':
-          setJustMoved(ev.piece.id);
+          animate(ev.piece.id, { kind: 'slide', fx: (ev.from.x - ev.to.x) * cell, fy: (ev.from.y - ev.to.y) * cell });
           sound ??= 'move';
           say('釣り野伏せ!', `${ev.piece.name}を ひきよせた`);
           break;
-        case 'capture':
-          sound = ev.by === 'shoot' ? 'shoot' : 'capture';
+        case 'capture': {
+          if (ev.by === 'shoot') {
+            sound = 'shoot';
+            showClash((ev.at.x + 0.5) * cell, (ev.at.y + 0.5) * cell, 'shot');
+            showDefender(ev.piece, ev.at);
+            busy = Math.max(busy, 900);
+          }
           if (ev.piece.kind === 'K') {
             say('勝負あり!', `大将 ${ev.piece.name}を とった!`);
-          } else {
-            say(ev.by === 'shoot' ? 'ズドン!' : '寝返り!', `${ev.piece.name}が ${army}に 寝返った`);
-            const from = stagePoint(cellRefs.current.get(`${ev.at.x},${ev.at.y}`));
+            break;
+          }
+          say(ev.by === 'shoot' ? 'ズドン!' : '寝返り!', `${ev.piece.name}が ${army}に 寝返った`);
+          // ぶつかり合いが終わってから、取った駒が もちごまへ飛ぶ
+          const at = ev.at;
+          const piece = ev.piece;
+          later(ev.by === 'move' ? 680 : 450, () => {
+            const from = stagePoint(cellRefs.current.get(`${at.x},${at.y}`));
             const to = stagePoint(handRefs.current[side]);
             if (from && to) {
               setGhost({
                 key: ++seq,
-                piece: ev.piece,
-                family: game.families[ev.piece.owner],
+                piece,
+                family: game.families[piece.owner],
                 from: { x: from.x + 6, y: from.y + 6 },
                 to: { x: to.x + to.w / 2 - 42, y: to.y + to.h / 2 - 42 },
               });
             }
-          }
+          });
           break;
+        }
         case 'promote':
           setJustPromoted(ev.piece.id);
           say(ev.piece.kind === 'P' ? '出世!' : '武勲!', ev.piece.kind === 'P' ? '足軽が 武将なみに つよくなった' : `${ev.piece.name}が 武勲を あげた`);
-          if (sound !== 'capture' && sound !== 'shoot') sound = 'promote';
+          if (sound !== 'shoot') sound = 'promote';
           break;
         case 'shield':
           say('小田原城!', `つぎの あいての番、${army}の駒は とられない`);
@@ -218,21 +288,65 @@ export function BattleScreen({ families, variant, onFinish, onQuit }: Props) {
       setTimeout(() => play(next.winner ? 'win' : 'draw'), 400);
       setTimeout(() => onFinish({ winner: next.winner, winReason: next.winReason, families, variant, moveCount: next.moveCount }), 1800);
     }
+    busyUntil.current = performance.now() + busy;
+    gameRef.current = next;
     setGame(next);
     setSel(null);
+    return busy;
   };
+
+  // ---- CPU ----
+  /** いま CPU が指す番か */
+  const isCpuTurn = !!cpu && !over && game.turn === cpu.side;
+  const isCpuSide = (side: Side) => !!cpu && cpu.side === side;
+  const [cpuThinking, setCpuThinking] = useState(false);
+  useEffect(() => {
+    if (!isCpuTurn || !cpu) return;
+    let cancelled = false;
+    setSel(null);
+    (async () => {
+      setCpuThinking(true);
+      const started = performance.now();
+      const actions = await think(gameRef.current, cpu.level);
+      await sleep(Math.max(0, CPU_MIN_THINK - (performance.now() - started)));
+      if (cancelled) return;
+      setCpuThinking(false);
+      for (const action of actions) {
+        if (cancelled) return;
+        if (action.type === 'activateSkill') {
+          setBanner({ key: ++seq, family: gameRef.current.families[gameRef.current.turn] });
+          play('skill');
+          dispatch(action);
+          await sleep(CPU_AFTER_SKILL);
+        } else {
+          // 戦闘のアニメーションが終わるまで待ってから、次の操作をする
+          const busy = dispatch(action) ?? 0;
+          await sleep(Math.max(CPU_STEP, busy + 150));
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+      setCpuThinking(false);
+    };
+    // CPU の番が始まったときに1回だけ考える (途中の局面の変化では考え直さない)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCpuTurn, game.moveCount]);
 
   const clearGhost = useCallback(() => setGhost(null), []);
 
   // ---- 操作 ----
   const onCell = (pos: Pos) => {
-    if (over) return;
+    if (over || isCpuTurn || performance.now() < busyUntil.current) return;
     if (phaseType === 'spawn') {
       if (isTarget(pos)) dispatch({ type: 'spawn', to: pos });
       return;
     }
-    if (phaseType === 'shoot' || phaseType === 'pull') {
-      if (sel?.type === 'board' && isTarget(pos)) return dispatch({ type: phaseType, from: sel.pos, to: pos });
+    if (phaseType === 'shoot' || (phaseType === 'pull' && phase?.step === 1)) {
+      if (sel?.type === 'board' && isTarget(pos)) {
+        dispatch({ type: phaseType, from: sel.pos, to: pos });
+        return;
+      }
       if (sources.some((p) => samePos(p, pos))) {
         play('select');
         return setSel({ type: 'board', pos });
@@ -253,7 +367,7 @@ export function BattleScreen({ families, variant, onFinish, onQuit }: Props) {
     setSel(null);
   };
 
-  const handEnabled = (side: Side) => !over && side === game.turn && (!phase || phaseType === 'drop2');
+  const handEnabled = (side: Side) => !over && !isCpuSide(side) && side === game.turn && (!phase || phaseType === 'drop2');
   const onHand = (side: Side, pieceId: string) => {
     if (!handEnabled(side)) return;
     if (sel?.type === 'hand' && sel.pieceId === pieceId) return setSel(null);
@@ -262,7 +376,7 @@ export function BattleScreen({ families, variant, onFinish, onQuit }: Props) {
   };
 
   const onSkill = () => {
-    if (!canActivateSkill(game)) return;
+    if (isCpuTurn || !canActivateSkill(game)) return;
     setBanner({ key: ++seq, family: game.families[game.turn] });
     play('skill');
     dispatch({ type: 'activateSkill' });
@@ -275,7 +389,9 @@ export function BattleScreen({ families, variant, onFinish, onQuit }: Props) {
   const hintButtons: { label: string; onClick: () => void }[] = [];
   const cancel = { label: 'やめる', onClick: () => dispatch({ type: 'cancelSkill' }) };
   const finish = (label: string) => ({ label, onClick: () => dispatch({ type: 'endSkill' }) });
-  if (over) {
+  if (isCpuTurn) {
+    hint = `${turnFam.army} (CPU ${LEVEL_LABEL[cpu!.level]}) が ${cpuThinking ? 'かんがえ中…' : 'さしているよ'}`;
+  } else if (over) {
     hint = game.draw ? 'おなじ局面が 3かい。ひきわけ!' : `${FAMILIES[game.families[game.winner as Side]].army}の かち!`;
   } else if (phase) {
     const step = phase.step;
@@ -284,7 +400,11 @@ export function BattleScreen({ families, variant, onFinish, onQuit }: Props) {
         hint = sel ? '撃つ あいてを えらんでね' : '撃つ 足軽を えらんでね (光っている足軽)';
         break;
       case 'pull':
-        hint = sel ? 'ひきよせる マスを えらんでね' : 'ひきよせる あいての駒を えらんでね (光っている駒)';
+        if (step === 1) hint = sel ? 'ひきよせる マスを えらんでね' : 'ひきよせる あいての駒を えらんでね (光っている駒)';
+        else {
+          hint = 'ひきよせた! つづけて 自分の駒を 1かい うごかせるよ';
+          hintButtons.push(finish('うごかさずに おわる'));
+        }
         break;
       case 'spawn':
         hint = '新しい 足軽を 打つ マスを えらんでね';
@@ -313,6 +433,7 @@ export function BattleScreen({ families, variant, onFinish, onQuit }: Props) {
         break;
     }
     if (step === 1) hintButtons.push(cancel);
+
   } else if (sel?.type === 'board' && selectedPiece) {
     hint = `${selectedPiece.name} を えらんだよ。光るマスに うごかそう`;
   } else if (sel?.type === 'hand' && selectedPiece) {
@@ -357,7 +478,7 @@ export function BattleScreen({ families, variant, onFinish, onQuit }: Props) {
               target={target}
               shooter={isSource}
               shielded={game.shield === piece.owner}
-              justMoved={justMoved === piece.id}
+              motion={motions[piece.id]}
               justPromoted={justPromoted === piece.id}
             />
           )}
@@ -371,6 +492,8 @@ export function BattleScreen({ families, variant, onFinish, onQuit }: Props) {
     <SidePanel
       side={side}
       compact={compact}
+      cpuLabel={isCpuSide(side) ? `CPU ${LEVEL_LABEL[cpu!.level]}` : cpu ? 'あなた' : null}
+      thinking={isCpuSide(side) && cpuThinking}
       game={game}
       selectedHandId={sel?.type === 'hand' ? sel.pieceId : null}
       handEnabled={handEnabled(side)}
@@ -396,7 +519,15 @@ export function BattleScreen({ families, variant, onFinish, onQuit }: Props) {
             style={{ background: over && game.draw ? '#5e5e5e' : turnFam.colors.border, boxShadow: over ? undefined : '0 0 0 3px #fff, 0 0 0 6px #ffc700' }}
           >
             {!over && game.turn === 'gote' && <span aria-hidden="true">◀</span>}
-            {over ? (game.draw ? 'ひきわけ' : `${FAMILIES[game.families[game.winner as Side]].army}の かち!`) : `${turnFam.army}の 番だよ`}
+            {over
+              ? game.draw
+                ? 'ひきわけ'
+                : `${FAMILIES[game.families[game.winner as Side]].army}の かち!`
+              : isCpuTurn
+                ? `${turnFam.army} (CPU) の 番`
+                : cpu
+                  ? 'あなたの 番だよ'
+                  : `${turnFam.army}の 番だよ`}
             {!over && game.turn === 'sente' && <span aria-hidden="true">▶</span>}
           </span>
         </div>
@@ -443,6 +574,14 @@ export function BattleScreen({ families, variant, onFinish, onQuit }: Props) {
           <div className="board-frame">
             <div className="board" style={{ gridTemplateColumns: `repeat(${cols}, ${cell}px)`, gridTemplateRows: `repeat(${rows}, ${cell}px)` }}>
               {cells}
+              {defenders.map((d) => (
+                <div key={d.key} className="defender" style={{ left: d.at.x * cell, top: d.at.y * cell, width: cell, height: cell }}>
+                  <PieceTile piece={d.piece} family={d.family} variant={variant} cell={cell} />
+                </div>
+              ))}
+              {clashes.map((c) => (
+                <Clash key={c.key} x={c.x} y={c.y} kind={c.kind} scale={cell / 96} />
+              ))}
             </div>
           </div>
           <div style={{ height: compact ? 40 : 44, display: 'flex', alignItems: 'center', gap: 12, fontSize: compact ? 17 : 16, fontWeight: 700, textAlign: 'center' }}>
@@ -505,6 +644,9 @@ function FlyingPiece({ ghost, onDone }: { ghost: Ghost; onDone: () => void }) {
 interface PanelProps {
   side: Side;
   compact: boolean;
+  /** CPU と遊ぶとき「CPU よわい」「あなた」の札。2人なら null */
+  cpuLabel: string | null;
+  thinking: boolean;
   game: GameState;
   selectedHandId: string | null;
   handEnabled: boolean;
@@ -513,7 +655,7 @@ interface PanelProps {
   handRef: (el: HTMLElement | null) => void;
 }
 
-function SidePanel({ side, compact, game, selectedHandId, handEnabled, onHand, onSkill, handRef }: PanelProps) {
+function SidePanel({ side, compact, cpuLabel, thinking, game, selectedHandId, handEnabled, onHand, onSkill, handRef }: PanelProps) {
   /** 顔アイコンと持ち駒タイルの大きさ */
   const face = compact ? 56 : 68;
   const hs = compact ? 64 : 72;
@@ -534,6 +676,7 @@ function SidePanel({ side, compact, game, selectedHandId, handEnabled, onHand, o
   let skillEnabled = false;
   if (game.skillUsed[side]) skillLabel = 'つかった';
   else if (game.skillPhase && isTurn) skillLabel = 'はつどう中…';
+  else if (cpuLabel?.startsWith('CPU')) skillLabel = 'CPUが つかうよ';
   else if (!isTurn) skillLabel = 'あいての 番だよ';
   else if (!canActivateSkill(game)) skillLabel = 'いまは つかえない';
   else skillEnabled = true;
@@ -558,7 +701,8 @@ function SidePanel({ side, compact, game, selectedHandId, handEnabled, onHand, o
           {side === 'sente' ? '先手' : '後手'} ・ 大将 {fam.lord}
         </span>
       </div>
-      {isTurn && <span key={`badge-${game.moveCount}`} className="turn-badge">いまの番!</span>}
+      {isTurn && <span key={`badge-${game.moveCount}`} className="turn-badge">{thinking ? 'かんがえ中…' : 'いまの番!'}</span>}
+      {cpuLabel && <span className={`who-badge${cpuLabel.startsWith('CPU') ? ' cpu' : ''}`}>{cpuLabel}</span>}
       {game.shield === side && <span style={{ position: 'absolute', left: 12, top: -10, padding: '3px 10px', borderRadius: 12, background: '#7fd3ff', color: '#13324a', fontSize: 13, fontWeight: 800, border: '2px solid #fff' }}>守り中</span>}
     </div>
   );
@@ -607,13 +751,7 @@ function SidePanel({ side, compact, game, selectedHandId, handEnabled, onHand, o
               >
                 <Chara kind={p.kind} family={famId} crop="bust" size={Math.round(hs * 0.64)} special={specialOf(p.name, p.originFamily)} />
                 <span style={{ fontSize: p.name.length > 4 ? 9 : 11, fontWeight: 800, lineHeight: 1, color: '#3a2a1f', whiteSpace: 'nowrap' }}>{p.name}</span>
-                {directions(p, game.variant).map(([dx, dy]) => (
-                  <span
-                    key={`${dx},${dy}`}
-                    className="dir-dot"
-                    style={{ width: 10, height: 10, left: hs / 2 + dx * (hs / 2) - 5, top: hs / 2 + dy * (hs / 2) - 5, background: fam.colors.border }}
-                  />
-                ))}
+                <DirArrows box={hs} half={hs / 2 - 1} dirs={directions(p, game.variant)} color={fam.colors.border} offset={3} />
               </button>
               {(ps.length > 1 || origin) && (
                 <div style={{ display: 'flex', gap: 4 }}>
