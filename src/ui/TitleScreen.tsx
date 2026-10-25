@@ -6,7 +6,9 @@ import { LordCarousel } from './LordCarousel';
 import { Scenery } from './Scenery';
 import { useStage } from './Stage';
 
-export function TitleScreen({ onStart }: { onStart: () => void }) {
+export type PlayMode = 'solo' | 'duo';
+
+export function TitleScreen({ onStart }: { onStart: (mode: PlayMode) => void }) {
   const { compact } = useStage();
   const [info, setInfo] = useState<FamilyId | null>(null);
   const closeInfo = useCallback(() => setInfo(null), []);
@@ -24,18 +26,35 @@ export function TitleScreen({ onStart }: { onStart: () => void }) {
         <div style={{ marginTop: compact ? 0 : 16 }}>
           <LordCarousel onSelect={setInfo} stopped={info !== null} />
         </div>
-        <button
-          className="btn btn-primary"
-          style={{ width: compact ? 280 : 320, height: compact ? 72 : 84, borderRadius: 42, fontSize: compact ? 36 : 40, letterSpacing: '0.2em', paddingLeft: '0.2em', marginTop: compact ? 6 : 12 }}
-          onClick={() => {
-            play('tap');
-            onStart();
-          }}
-        >
-          あそぶ!
-        </button>
+        <div style={{ display: 'flex', gap: compact ? 24 : 32, marginTop: compact ? 6 : 12 }}>
+          {(
+            [
+              ['solo', 'ひとりで あそぶ', 'CPUと たたかう'],
+              ['duo', 'ふたりで あそぶ', 'おなじ たんまつで'],
+            ] as const
+          ).map(([mode, label, sub]) => (
+            <button
+              key={mode}
+              className="btn btn-primary"
+              style={{
+                width: compact ? 300 : 330, height: compact ? 76 : 88, borderRadius: 44, flexDirection: 'column', gap: 2, lineHeight: 1.1,
+                background: mode === 'duo' ? '#2e5e8c' : undefined, boxShadow: mode === 'duo' ? '0 6px 0 #1f4468' : undefined,
+              }}
+              onClick={() => {
+                play('tap');
+                onStart(mode);
+              }}
+            >
+              <span style={{ fontSize: compact ? 30 : 32, letterSpacing: '0.08em' }}>{label}</span>
+              <span style={{ fontSize: 15, fontWeight: 700, opacity: 0.9 }}>{sub}</span>
+            </button>
+          ))}
+        </div>
       </div>
-      <div style={{ position: 'absolute', right: 40, bottom: compact ? 12 : 20, fontSize: 15, fontWeight: 700, color: '#1f3d1a' }}>大将を おすと 家紋と 武将が みられるよ</div>
+      {/* スマホでは画面が低くボタンと重なるので出さない */}
+      {!compact && (
+        <div style={{ position: 'absolute', right: 40, bottom: 20, fontSize: 15, fontWeight: 700, color: '#1f3d1a' }}>大将を おすと 家紋と 武将が みられるよ</div>
+      )}
       {info && <FamilyInfo family={info} onClose={closeInfo} />}
     </div>
   );

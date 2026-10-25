@@ -32,7 +32,7 @@ export interface Motion {
   fy: number;
 }
 
-/** 盤上の駒。家の色の枠、胸から上のキャラ、武将名、動ける方向の三角 */
+/** 盤上の駒。家の色の枠、胸から上のキャラ、武将名、動ける方向の点 */
 export function PieceTile({ piece, family, variant, cell, selected, target, shooter, shielded, justPromoted, motion }: Props) {
   const c = FAMILIES[family].colors;
   /** 大将は金色のタイルと金色の縁取り、右上に家紋、下に名前のたすきで、ひと目でわかるようにする */
@@ -100,15 +100,15 @@ export function PieceTile({ piece, family, variant, cell, selected, target, shoo
         )}
         {piece.promoted && <span className="rank-badge">{piece.kind === 'P' ? '出世' : '武勲'}</span>}
       </div>
-      <DirArrows box={cell} half={(cell - 12) / 2} dirs={directions(piece, variant)} color={piece.promoted ? '#C98A00' : c.border} />
+      <DirDots box={cell} half={(cell - 12) / 2} dirs={directions(piece, variant)} color={piece.promoted ? '#C98A00' : c.border} />
     </div>
   );
 }
 
-interface ArrowProps {
-  /** 三角を並べる正方形の一辺 (この中心が駒の中心) */
+interface DotProps {
+  /** 点を並べる正方形の一辺 (この中心が駒の中心) */
   box: number;
-  /** 駒のタイルの一辺の半分。三角はタイルのふちに置く */
+  /** 駒のタイルの一辺の半分。点はタイルのふちに置く */
   half: number;
   dirs: [number, number][];
   color: string;
@@ -116,27 +116,22 @@ interface ArrowProps {
   offset?: number;
 }
 
-/** 駒の動ける方向を、タイルのふちの三角 (矢じり) で示す */
-export function DirArrows({ box, half, dirs, color, offset = 0 }: ArrowProps) {
-  const s = half / 42;
+/** 駒の動ける方向を、タイルのふちの点で示す */
+export function DirDots({ box, half, dirs, color, offset = 0 }: DotProps) {
+  const r = Math.max(4, (6 * half) / 42);
   return (
     <svg className="dir-arrows" width={box} height={box} aria-hidden="true" style={offset ? { left: -offset, top: -offset } : undefined}>
-      {dirs.map(([dx, dy]) => {
-        const deg = (Math.atan2(dx, -dy) * 180) / Math.PI;
-        // ななめは角が丸いぶん、少し外側に置く
-        const edge = dx !== 0 && dy !== 0 ? half * 1.24 : half;
-        return (
-          <path
-            key={`${dx},${dy}`}
-            d={`M0 ${-edge - 11 * s} L${-7 * s} ${-edge + s} L${7 * s} ${-edge + s} Z`}
-            transform={`translate(${box / 2} ${box / 2}) rotate(${deg})`}
-            fill={color}
-            stroke="#fff"
-            strokeWidth={Math.max(1.5, 2 * s)}
-            strokeLinejoin="round"
-          />
-        );
-      })}
+      {dirs.map(([dx, dy]) => (
+        <circle
+          key={`${dx},${dy}`}
+          cx={box / 2 + dx * half}
+          cy={box / 2 + dy * half}
+          r={r}
+          fill={color}
+          stroke="#fff"
+          strokeWidth={Math.max(1.5, (2 * half) / 42)}
+        />
+      ))}
     </svg>
   );
 }

@@ -7,7 +7,7 @@ import { CharacterSheet } from './ui/CharacterSheet';
 import { ResultScreen } from './ui/ResultScreen';
 import { SelectScreen } from './ui/SelectScreen';
 import { Stage } from './ui/Stage';
-import { TitleScreen } from './ui/TitleScreen';
+import { TitleScreen, type PlayMode } from './ui/TitleScreen';
 
 type Screen =
   | { name: 'title' }
@@ -20,6 +20,8 @@ export default function App() {
   const [families, setFamilies] = useState<Record<Side, FamilyId>>({ sente: 'oda', gote: 'uesugi' });
   const [variant, setVariant] = useState<Variant>('small');
   const [cpu, setCpu] = useState<CpuSetting | null>(null);
+  /** ひとりで (CPU と) 遊ぶか、ふたりで遊ぶか。タイトル画面で選ぶ */
+  const [mode, setMode] = useState<PlayMode>('solo');
   const [round, setRound] = useState(0);
 
   const startBattle = () => {
@@ -37,12 +39,20 @@ export default function App() {
 
   return (
     <Stage>
-      {screen.name === 'title' && <TitleScreen onStart={() => setScreen({ name: 'select' })} />}
+      {screen.name === 'title' && (
+        <TitleScreen
+          onStart={(m) => {
+            setMode(m);
+            setScreen({ name: 'select' });
+          }}
+        />
+      )}
       {screen.name === 'select' && (
         <SelectScreen
           initial={families}
           initialVariant={variant}
           initialCpu={cpu}
+          solo={mode === 'solo'}
           onBack={() => setScreen({ name: 'title' })}
           onStart={(f, v, c) => {
             setFamilies(f);

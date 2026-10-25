@@ -11,6 +11,8 @@ interface Props {
   initial: Record<Side, FamilyId>;
   initialVariant: Variant;
   initialCpu: CpuSetting | null;
+  /** ひとりで (CPU と) 遊ぶとき true。CPU の強さは「かいせん!」のあとに選ぶ */
+  solo: boolean;
   onBack: () => void;
   onStart: (families: Record<Side, FamilyId>, variant: Variant, cpu: CpuSetting | null) => void;
 }
@@ -27,16 +29,16 @@ const iconPos = (id: FamilyId, compact: boolean): [number, number] => {
   return compact ? [x, Math.max(125, Math.min(y, 585))] : [x, y];
 };
 
-export function SelectScreen({ initial, initialVariant, initialCpu, onBack, onStart }: Props) {
+export function SelectScreen({ initial, initialVariant, initialCpu, solo, onBack, onStart }: Props) {
   const [picked, setPicked] = useState(initial);
   const [variant, setVariant] = useState<Variant>(initialVariant);
   /** いま地図で選んでいる側 */
   const [active, setActive] = useState<Side>('sente');
-  /** 対戦相手: ふたりで遊ぶか、CPU (よわい・ふつう) か */
-  const [opponentKind, setOpponentKind] = useState<'human' | CpuLevel>(initialCpu?.level ?? 'human');
   /** CPU と遊ぶとき、自分が指す側 */
   const [humanSide, setHumanSide] = useState<Side>(initialCpu ? other(initialCpu.side) : 'sente');
-  const cpu: CpuSetting | null = opponentKind === 'human' ? null : { side: other(humanSide), level: opponentKind };
+  /** 「かいせん!」のあとに出す、CPU の強さを選ぶ窓 */
+  const [askLevel, setAskLevel] = useState(false);
+  const cpu: { side: Side } | null = solo ? { side: other(humanSide) } : null;
   /** 「先手」「後手」に、CPU と遊ぶときは「あなた」「CPU」を添える */
   const who = (s: Side) => (cpu ? (cpu.side === s ? 'CPU' : 'あなた') : null);
   const { compact, h } = useStage();
@@ -263,31 +265,6 @@ export function SelectScreen({ initial, initialVariant, initialCpu, onBack, onSt
             })}
           </div>
 
-          <div role="radiogroup" aria-label="あいて" className="segment">
-            {(['human', 'weak', 'normal'] as const).map((k) => {
-              const on = opponentKind === k;
-              return (
-                <button
-                  key={k}
-                  role="radio"
-                  aria-checked={on}
-                  className="btn"
-                  onClick={() => {
-                    play('select');
-                    setOpponentKind(k);
-                  }}
-                  style={{
-                    flex: '1 1 0', height: compact ? 46 : 44, borderRadius: 20, flexDirection: 'column', gap: 0, lineHeight: 1.15,
-                    background: on ? '#6b3fa0' : 'transparent', color: on ? '#fff' : '#5b3290',
-                  }}
-                >
-                  <span style={{ fontSize: compact ? 18 : 16 }}>{k === 'human' ? 'ふたりで' : `CPU ${LEVEL_LABEL[k]}`}</span>
-                  {!compact && <span style={{ fontSize: 11, fontWeight: 700 }}>{k === 'human' ? 'おなじ たんまつで' : 'ひとりで あそぶ'}</span>}
-                </button>
-              );
-            })}
-          </div>
-
           {cpu && (
             <div role="radiogroup" aria-label="あなたが 指す側" className="segment">
               {(['sente', 'gote'] as Side[]).map((s) => {
@@ -315,13 +292,72 @@ export function SelectScreen({ initial, initialVariant, initialCpu, onBack, onSt
             className="btn btn-primary"
             style={{ marginTop: 'auto', flex: '0 0 auto', height: compact ? 60 : 62, borderRadius: 34, fontSize: compact ? 28 : 30, letterSpacing: '0.15em', paddingLeft: '0.15em' }}
             onClick={() => {
+              if (solo) {
+                play('tap');
+                setAskLevel(true);
+                return;
+              }
               play('skill');
-              onStart(picked, variant, cpu);
+              onStart(picked, variant, null);
             }}
           >
             かいせん!
           </button>
         </aside>
+      </div>
+      {askLevel && (
+        <LevelPicker
+          onCancel={() => setAskLevel(false)}
+          onPick={(level) => {
+            play('skill');
+            onStart(picked, variant, { side: other(humanSide), level });
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+const LEVELS: { level: CpuLevel; sub: string; color: string; shadow: string }[] = [
+  { level: 'weak', sub: 'はじめての人に おすすめ', color: '#3f9b4a', shadow: '#2c6f34' },
+  { level: 'normal', sub: 'すこし 先を よんで さしてくる', color: '#d0392e', shadow: '#9e2a22' },
+];
+
+/** 「かいせん!」のあとに、CPU の強さを選ぶ窓 */
+function LevelPicker({ onPick, onCancel }: { onPick: (level: CpuLevel) => void; onCancel: () => void }) {
+  return (
+    <div className="info-backdrop" onClick={onCancel}>
+      <div
+        className="info-card"
+        role="dialog"
+        aria-modal="true"
+        aria-label="CPUの つよさを えらぶ"
+        onClick={(e) => e.stopPropagation()}
+        style={{ flexDirection: 'column', gap: 22, padding: '28px 40px 32px', borderColor: '#6b3fa0', width: 640 }}
+      >
+        <h2 className="display" style={{ margin: 0, fontSize: 34, fontWeight: 400 }}>
+          CPUの つよさを えらんでね
+        </h2>
+        <div style={{ display: 'flex', gap: 24 }}>
+          {LEVELS.map((l) => (
+            <button
+              key={l.level}
+              className="btn"
+              autoFocus={l.level === 'weak'}
+              onClick={() => onPick(l.level)}
+              style={{
+                width: 260, height: 120, borderRadius: 28, flexDirection: 'column', gap: 6, color: '#fff',
+                background: l.color, boxShadow: `0 6px 0 ${l.shadow}`,
+              }}
+            >
+              <span style={{ fontSize: 40, lineHeight: 1 }}>{LEVEL_LABEL[l.level]}</span>
+              <span style={{ fontSize: 15, fontWeight: 700 }}>{l.sub}</span>
+            </button>
+          ))}
+        </div>
+        <button className="btn btn-ghost" onClick={onCancel}>
+          もどる
+        </button>
       </div>
     </div>
   );

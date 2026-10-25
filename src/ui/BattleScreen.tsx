@@ -22,7 +22,7 @@ import {
 import type { Action, GameState, Piece, Pos, Side, Variant, WinReason } from '../engine/types';
 import { isMuted, play, setMuted, type SoundName } from '../audio/sound';
 import { Chara, specialOf } from './Chara';
-import { DirArrows, PieceTile, type Motion } from './PieceTile';
+import { DirDots, PieceTile, type Motion } from './PieceTile';
 import { Clash } from './Clash';
 import { useStage } from './Stage';
 import { think } from '../ai/think';
@@ -755,7 +755,7 @@ function SidePanel({ side, compact, cpuLabel, thinking, game, selectedHandId, ha
               >
                 <Chara kind={p.kind} family={famId} crop="bust" size={Math.round(hs * 0.64)} special={specialOf(p.name, p.originFamily)} />
                 <span style={{ fontSize: p.name.length > 4 ? 9 : 11, fontWeight: 800, lineHeight: 1, color: '#3a2a1f', whiteSpace: 'nowrap' }}>{p.name}</span>
-                <DirArrows box={hs} half={hs / 2 - 1} dirs={directions(p, game.variant)} color={fam.colors.border} offset={3} />
+                <DirDots box={hs} half={hs / 2 - 1} dirs={directions(p, game.variant)} color={fam.colors.border} offset={3} />
               </button>
               {(ps.length > 1 || origin) && (
                 <div style={{ display: 'flex', gap: 4 }}>
