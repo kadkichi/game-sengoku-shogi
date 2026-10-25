@@ -16,6 +16,12 @@ npm run dev
 | `npm test` | ゲームエンジンのテスト |
 | `npm run build` | 型チェックと本番ビルド (`dist/`、静的ホスティングでそのまま配布できる) |
 
+## 公開
+
+https://kadkichi.github.io/game-sengoku-shogi/
+
+main に push すると、GitHub Actions (`.github/workflows/deploy.yml`) がテスト・ビルドして GitHub Pages に公開する。
+
 ## 構成
 
 - `src/engine/` ルール (合法手・成り・打ち駒・寝返り・必殺技・勝敗・千日手)。UI に依存しない純粋関数
