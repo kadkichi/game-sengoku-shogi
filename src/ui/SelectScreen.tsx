@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { FAMILIES, FAMILY_IDS, MODES, type FamilyId } from '../data/families';
+import { ISLANDS, MAP_H, MAP_POINTS, MAP_W } from '../data/map';
 import type { Side, Variant } from '../engine/types';
 import { play } from '../audio/sound';
-import { Chara, specialOf } from './Chara';
+import { Chara } from './Chara';
 
 interface Props {
   initial: Record<Side, FamilyId>;
@@ -11,33 +12,33 @@ interface Props {
   onStart: (families: Record<Side, FamilyId>, variant: Variant) => void;
 }
 
-const SIDES: { side: Side; label: string; sub: string }[] = [
-  { side: 'sente', label: '先手', sub: 'さきに うごく' },
-  { side: 'gote', label: '後手', sub: 'あとから うごく' },
-];
+const SIDE_NAME: Record<Side, string> = { sente: '先手', gote: '後手' };
+const SIDE_SUB: Record<Side, string> = { sente: 'さきに うごく', gote: 'あとから うごく' };
+const SIDE_COLOR: Record<Side, string> = { sente: '#D0392E', gote: '#2E5E8C' };
 
-const KIND_LABELS: Record<Variant, { gold: string; silver: string; pawns: string }> = {
-  small: { gold: '金の武将 (たて・よこ)', silver: '銀の武将 (ななめ)', pawns: '1人' },
-  large: { gold: '金の武将', silver: '銀の武将', pawns: '3人' },
-};
+const LINES = FAMILY_IDS.map((id) => {
+  const { home, icon } = MAP_POINTS[id];
+  return `M${home[0]} ${home[1]} L${icon[0]} ${icon[1]}`;
+}).join(' ');
 
 export function SelectScreen({ initial, initialVariant, onBack, onStart }: Props) {
   const [picked, setPicked] = useState(initial);
   const [variant, setVariant] = useState<Variant>(initialVariant);
-  const labels = KIND_LABELS[variant];
-  /** かんたんは 金の武将=gold[0]、銀の武将=gold[1] */
-  const roster = (id: FamilyId) => {
-    const f = FAMILIES[id];
-    return variant === 'small'
-      ? { gold: [f.gold[0]], silver: [f.gold[1]] }
-      : { gold: [...f.gold], silver: [...f.silver] };
+  /** いま地図で選んでいる側 */
+  const [active, setActive] = useState<Side>('sente');
+
+  const pick = (id: FamilyId) => {
+    play('select');
+    setPicked((cur) => ({ ...cur, [active]: id }));
+    // 先手を選んだら、続けて後手を選ぶ
+    if (active === 'sente') setActive('gote');
   };
 
-  const pickRandom = (side: Side) => {
+  const pickRandom = () => {
     play('select');
     setPicked((cur) => {
-      const others = FAMILY_IDS.filter((id) => id !== cur[side]);
-      return { ...cur, [side]: others[Math.floor(Math.random() * others.length)] };
+      const others = FAMILY_IDS.filter((id) => id !== cur[active]);
+      return { ...cur, [active]: others[Math.floor(Math.random() * others.length)] };
     });
   };
 
@@ -48,139 +49,213 @@ export function SelectScreen({ initial, initialVariant, onBack, onStart }: Props
           ← もどる
         </button>
         <h1 className="display" style={{ margin: 0, fontSize: 32, letterSpacing: '0.1em' }}>
-          大名を えらぼう
+          地図から 大名を えらぼう
         </h1>
         <div style={{ width: 128, fontSize: 13, fontWeight: 700, color: 'var(--muted)', textAlign: 'right' }}>おなじ家でも いいよ</div>
       </div>
 
-      <div style={{ flex: '1 1 auto', display: 'flex', gap: 32, padding: '14px 32px 0' }}>
-        {SIDES.map(({ side, label, sub }) => {
-          const f = FAMILIES[picked[side]];
-          const r = roster(f.id);
-          return (
-            <section key={side} style={{ width: 592, display: 'flex', flexDirection: 'column', gap: 10 }} aria-label={`${label}の大名`}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', height: 32, padding: '0 14px', borderRadius: 16, fontSize: 17, fontWeight: 800, color: '#fff', background: f.colors.border }}>
-                  {label}
-                </span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--muted)' }}>{sub}</span>
-                <button className="btn btn-ghost" style={{ marginLeft: 'auto', height: 32, fontSize: 13, padding: '0 12px' }} onClick={() => pickRandom(side)}>
-                  おまかせ
-                </button>
-              </div>
+      <div style={{ flex: '1 1 auto', display: 'flex', gap: 24, padding: 16 }}>
+        {/* 地図 */}
+        <div
+          style={{
+            position: 'relative', width: MAP_W, height: MAP_H, flex: '0 0 auto', borderRadius: 28, overflow: 'hidden',
+            background: '#bfe3f7', border: '3px solid #8cc4e3',
+          }}
+        >
+          <svg width={MAP_W} height={MAP_H} viewBox={`0 0 ${MAP_W} ${MAP_H}`} aria-hidden="true" style={{ position: 'absolute', left: -3, top: -3 }}>
+            <path
+              d="M60 120 q12 -10 24 0 q12 10 24 0 M700 520 q12 -10 24 0 q12 10 24 0 M110 250 q12 -10 24 0 q12 10 24 0 M560 640 q12 -10 24 0 q12 10 24 0 M760 640 q12 -10 24 0 q12 10 24 0 M300 80 q12 -10 24 0 q12 10 24 0"
+              fill="none"
+              stroke="#fff"
+              strokeWidth={4}
+              strokeLinecap="round"
+              opacity={0.7}
+            />
+            <g transform="translate(0 9)" fill="#9ccfe8">
+              {Object.values(ISLANDS).map((d) => (
+                <path key={d} d={d} />
+              ))}
+            </g>
+            <g fill="#f7e9c6" stroke="#c9a86a" strokeWidth={4} strokeLinejoin="round">
+              {Object.values(ISLANDS).map((d) => (
+                <path key={d} d={d} />
+              ))}
+            </g>
+            <path d={LINES} fill="none" stroke="#3a1f14" strokeWidth={2.5} strokeDasharray="2 6" strokeLinecap="round" />
+            {FAMILY_IDS.map((id) => {
+              const [x, y] = MAP_POINTS[id].home;
+              return <circle key={id} cx={x} cy={y} r={7.5} fill={FAMILIES[id].colors.border} stroke="#fff" strokeWidth={3} />;
+            })}
+          </svg>
 
-              <div role="radiogroup" aria-label={`${label}の大名家`} style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8 }}>
-                {FAMILY_IDS.map((id) => {
-                  const on = id === picked[side];
-                  const c = FAMILIES[id].colors;
-                  return (
-                    <button
-                      key={id}
-                      role="radio"
-                      aria-checked={on}
-                      className="btn"
-                      onClick={() => {
-                        play('select');
-                        setPicked((cur) => ({ ...cur, [side]: id }));
-                      }}
-                      style={{
-                        height: 64, borderRadius: 16, gap: 4, padding: '0 6px 0 2px', justifyContent: 'flex-start',
-                        background: on ? c.tile : '#fff',
-                        border: on ? `3px solid ${c.border}` : '2px solid var(--line)',
-                        boxShadow: on ? `0 4px 0 ${c.border}` : '0 2px 0 var(--line)',
-                        transform: on ? 'translateY(-2px)' : undefined,
-                      }}
-                    >
-                      <Chara kind="K" family={id} crop="bust" size={52} />
-                      <span style={{ fontSize: FAMILIES[id].name.length > 3 ? 13 : 16, fontWeight: 800, lineHeight: 1.1, textAlign: 'left' }}>{FAMILIES[id].name}</span>
-                    </button>
-                  );
-                })}
-              </div>
+          <div
+            aria-live="polite"
+            style={{
+              position: 'absolute', left: 21, top: 17, display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px 8px 16px',
+              borderRadius: 20, background: 'rgba(255,255,255,0.92)', border: '2px solid #8cc4e3',
+            }}
+          >
+            <span style={{ width: 14, height: 14, borderRadius: 7, background: SIDE_COLOR[active] }} />
+            <span style={{ fontSize: 17, fontWeight: 800 }}>{SIDE_NAME[active]}の 大名を 地図から えらんでね</span>
+            <button className="btn btn-ghost" style={{ height: 34, fontSize: 13, padding: '0 12px' }} onClick={pickRandom}>
+              おまかせ
+            </button>
+          </div>
 
-              <div className="card" style={{ flex: '1 1 auto', borderRadius: 22, padding: '12px 18px', display: 'flex', flexDirection: 'column', gap: 10, borderColor: f.colors.border }}>
-                <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-                  <div style={{ width: 92, height: 92, flex: '0 0 auto', borderRadius: 46, display: 'flex', alignItems: 'center', justifyContent: 'center', background: f.colors.tile, border: `4px solid ${f.colors.border}`, overflow: 'hidden' }}>
-                    <Chara kind="K" family={f.id} crop="bust" size={86} title={f.lord} />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-                    <span className="label">{f.name} の 大将</span>
-                    <span style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.1 }}>{f.lord}</span>
-                  </div>
-                </div>
-                <div style={{ background: '#fff7e0', borderRadius: 14, padding: '8px 14px', display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-                    <span className="label-gold">ひっさつわざ (1かいだけ)</span>
-                    <span style={{ fontSize: 20, fontWeight: 800 }}>{f.skill.name}</span>
-                  </div>
-                  <span style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.5, color: '#4a3b2c' }}>
-                    {f.skill.desc}
-                    {variant === 'small' && f.skill.smallNote ? ` ※${f.skill.smallNote}` : ''}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {([[labels.gold, r.gold, 'G'], [labels.silver, r.silver, 'S']] as const).map(([kindLabel, names, kind]) => (
-                    <div key={kindLabel} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span className="label" style={{ width: 148 }}>{kindLabel}</span>
-                      {names.map((n) => (
-                        <span key={n} style={{ display: 'inline-flex', alignItems: 'center', gap: 2, height: 32, padding: '0 12px 0 2px', borderRadius: 16, fontSize: 15, fontWeight: 800, background: f.colors.tile, border: `2px solid ${f.colors.border}`, overflow: 'hidden' }}>
-                          <Chara kind={kind} family={f.id} crop="bust" size={28} special={specialOf(n, f.id)} />
-                          {n}
-                        </span>
-                      ))}
-                    </div>
-                  ))}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span className="label" style={{ width: 148 }}>足軽</span>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: '#4a3b2c' }}>{labels.pawns} (名前なし)</span>
-                  </div>
-                </div>
-              </div>
-            </section>
-          );
-        })}
-      </div>
-
-      <div style={{ height: 100, flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 24 }}>
-        <div role="radiogroup" aria-label="あそびかた" style={{ display: 'flex', gap: 8, padding: 6, borderRadius: 26, background: '#fff', border: '2px solid var(--line)' }}>
-          {(['small', 'large'] as Variant[]).map((v) => {
-            const on = v === variant;
+          {FAMILY_IDS.map((id) => {
+            const f = FAMILIES[id];
+            const { icon, place } = MAP_POINTS[id];
+            const isS = picked.sente === id;
+            const isG = picked.gote === id;
+            const on = isS || isG;
+            const sides = (['sente', 'gote'] as Side[]).filter((s) => picked[s] === id);
+            // 選ばれた側の色の太い輪。両方なら 内側=先手、外側=後手
+            const border = isS ? SIDE_COLOR.sente : isG ? SIDE_COLOR.gote : f.colors.border;
+            const shadow =
+              isS && isG
+                ? `0 0 0 3px #fff, 0 0 0 9px ${SIDE_COLOR.gote}, 0 6px 0 9px rgba(0,0,0,0.18)`
+                : on
+                  ? `0 0 0 3px #fff, 0 0 0 7px ${border}, 0 6px 0 7px rgba(0,0,0,0.18)`
+                  : '0 3px 0 rgba(0,0,0,0.15)';
+            const picked2 = sides.map((s) => SIDE_NAME[s]).join('と');
             return (
               <button
-                key={v}
-                role="radio"
-                aria-checked={on}
-                className="btn"
-                title={MODES[v].desc}
-                onClick={() => {
-                  play('select');
-                  setVariant(v);
-                }}
-                style={{
-                  height: 52, padding: '0 18px', borderRadius: 20, flexDirection: 'column', gap: 0, lineHeight: 1.15,
-                  background: on ? 'var(--blue)' : 'transparent', color: on ? '#fff' : 'var(--blue)',
-                }}
+                key={id}
+                className={`map-chip${on ? ' picked' : ''}`}
+                aria-pressed={on}
+                aria-label={`${f.name} (${f.lord}、${place})${on ? ` ${picked2}に えらばれている` : ''}`}
+                onClick={() => pick(id)}
+                style={{ left: icon[0] - 56, top: icon[1] - 46, zIndex: on ? 3 : 1 }}
               >
-                <span style={{ fontSize: 18 }}>{MODES[v].label}</span>
-                <span style={{ fontSize: 12, fontWeight: 700 }}>{MODES[v].size}</span>
+                <span className="map-face-wrap">
+                  {sides.map((s, i) => (
+                    <span key={s} className="map-halo" style={{ borderColor: SIDE_COLOR[s], animationDelay: `${i * 0.8}s` }} />
+                  ))}
+                  <span className="map-face" style={{ background: f.colors.tile, border: `${on ? 6 : 3}px solid ${border}`, boxShadow: shadow }}>
+                    <Chara kind="K" family={id} crop="bust" size={58} />
+                  </span>
+                </span>
+                <span className="map-name" style={{ background: f.colors.border, fontSize: f.name.length > 3 ? 12 : 14 }}>
+                  {f.name}
+                </span>
+                {on && (
+                  <span className="map-badges">
+                    {sides.map((s) => (
+                      <span key={s} className="map-badge" style={{ background: SIDE_COLOR[s] }}>
+                        {SIDE_NAME[s]}
+                      </span>
+                    ))}
+                  </span>
+                )}
               </button>
             );
           })}
         </div>
-        <span style={{ width: 210, fontSize: 13, fontWeight: 700, lineHeight: 1.5, color: 'var(--muted)' }}>{MODES[variant].desc}</span>
-        <span style={{ fontSize: 19, fontWeight: 800 }}>
-          {FAMILIES[picked.sente].name} たい {FAMILIES[picked.gote].name}
-        </span>
-        <button
-          className="btn btn-primary"
-          style={{ width: 260, height: 68, borderRadius: 34, fontSize: 30, letterSpacing: '0.15em', paddingLeft: '0.15em' }}
-          onClick={() => {
-            play('skill');
-            onStart(picked, variant);
-          }}
-        >
-          かいせん!
-        </button>
+
+        {/* 右: 選んだ大名 */}
+        <aside style={{ flex: '1 1 auto', display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
+          <div role="radiogroup" aria-label="いま えらんでいる 側" className="segment">
+            {(['sente', 'gote'] as Side[]).map((side) => {
+              const on = active === side;
+              return (
+                <button
+                  key={side}
+                  role="radio"
+                  aria-checked={on}
+                  className="btn"
+                  onClick={() => {
+                    play('tap');
+                    setActive(side);
+                  }}
+                  style={{ flex: '1 1 0', height: 44, borderRadius: 20, fontSize: 16, background: on ? SIDE_COLOR[side] : 'transparent', color: on ? '#fff' : SIDE_COLOR[side] }}
+                >
+                  {SIDE_NAME[side]}を えらぶ
+                </button>
+              );
+            })}
+          </div>
+
+          {(['sente', 'gote'] as Side[]).map((side) => {
+            const f = FAMILIES[picked[side]];
+            const on = active === side;
+            return (
+              <button
+                key={side}
+                className="btn"
+                aria-label={`${SIDE_NAME[side]} ${f.name}。押すと ${SIDE_NAME[side]}を えらびなおせる`}
+                onClick={() => setActive(side)}
+                style={{
+                  background: '#fff', borderRadius: 20, padding: '12px 14px', flexDirection: 'column', alignItems: 'stretch', gap: 8, textAlign: 'left', fontWeight: 400,
+                  border: on ? `4px solid ${SIDE_COLOR[side]}` : '2px solid var(--line)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', height: 28, padding: '0 12px', borderRadius: 14, fontSize: 15, fontWeight: 800, color: '#fff', background: SIDE_COLOR[side] }}>
+                    {SIDE_NAME[side]}
+                  </span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--muted)' }}>{on ? '地図で えらんでいるよ' : SIDE_SUB[side]}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <span style={{ width: 84, height: 84, flex: '0 0 auto', borderRadius: 42, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: f.colors.tile, border: `4px solid ${f.colors.border}` }}>
+                    <Chara kind="K" family={f.id} crop="bust" size={78} title={f.lord} />
+                  </span>
+                  <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                    <span className="label">
+                      {f.name} の 大将 ({MAP_POINTS[f.id].place})
+                    </span>
+                    <span style={{ fontSize: f.lord.length > 4 ? 22 : 26, fontWeight: 800, lineHeight: 1.1 }}>{f.lord}</span>
+                  </span>
+                </div>
+                <span style={{ background: '#fff7e0', borderRadius: 14, padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span className="label-gold">ひっさつわざ「{f.skill.name}」</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.45, color: '#4a3b2c' }}>
+                    {f.skill.short}
+                    {variant === 'small' && f.skill.smallNote ? ` ※${f.skill.smallNote}` : ''}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+
+          <div role="radiogroup" aria-label="あそびかた" className="segment">
+            {(['small', 'large'] as Variant[]).map((v) => {
+              const on = v === variant;
+              return (
+                <button
+                  key={v}
+                  role="radio"
+                  aria-checked={on}
+                  className="btn"
+                  title={MODES[v].desc}
+                  onClick={() => {
+                    play('select');
+                    setVariant(v);
+                  }}
+                  style={{
+                    flex: '1 1 0', height: 50, borderRadius: 20, flexDirection: 'column', gap: 0, lineHeight: 1.15,
+                    background: on ? 'var(--blue)' : 'transparent', color: on ? '#fff' : 'var(--blue)',
+                  }}
+                >
+                  <span style={{ fontSize: 17 }}>
+                    {MODES[v].label} <span style={{ fontSize: 12, fontWeight: 700 }}>{MODES[v].size}</span>
+                  </span>
+                  <span style={{ fontSize: 11, fontWeight: 700 }}>{v === 'small' ? 'すぐ おわる' : 'じっくり たたかう'}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <button
+            className="btn btn-primary"
+            style={{ marginTop: 'auto', height: 68, borderRadius: 34, fontSize: 30, letterSpacing: '0.15em', paddingLeft: '0.15em' }}
+            onClick={() => {
+              play('skill');
+              onStart(picked, variant);
+            }}
+          >
+            かいせん!
+          </button>
+        </aside>
       </div>
     </div>
   );

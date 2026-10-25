@@ -388,8 +388,14 @@ export function BattleScreen({ families, variant, onFinish, onQuit }: Props) {
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }} aria-live="polite">
           <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--muted)' }}>{over ? `${game.moveCount}手で けっちゃく` : `${game.moveCount + 1}手め`}</span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', height: 40, padding: '0 22px', borderRadius: 20, background: over && game.draw ? '#5e5e5e' : turnFam.colors.border, color: '#fff', fontSize: 18, fontWeight: 800 }}>
+          <span
+            key={over ? 'over' : game.turn}
+            className="turn-pill"
+            style={{ background: over && game.draw ? '#5e5e5e' : turnFam.colors.border, boxShadow: over ? undefined : '0 0 0 3px #fff, 0 0 0 6px #ffc700' }}
+          >
+            {!over && game.turn === 'gote' && <span aria-hidden="true">◀</span>}
             {over ? (game.draw ? 'ひきわけ' : `${FAMILIES[game.families[game.winner as Side]].army}の かち!`) : `${turnFam.army}の 番だよ`}
+            {!over && game.turn === 'sente' && <span aria-hidden="true">▶</span>}
           </span>
         </div>
         <div style={{ display: 'flex', gap: 10, width: 260, justifyContent: 'flex-end' }}>
@@ -507,7 +513,8 @@ interface PanelProps {
 function SidePanel({ side, game, selectedHandId, handEnabled, onHand, onSkill, handRef }: PanelProps) {
   const famId = game.families[side];
   const fam = FAMILIES[famId];
-  const isTurn = game.turn === side && game.winner === null && !game.draw;
+  const over = game.winner !== null || game.draw;
+  const isTurn = game.turn === side && !over;
   const top = side === 'gote';
 
   // 持ち駒は 種類・名前・元の家 ごとにまとめる
@@ -527,13 +534,17 @@ function SidePanel({ side, game, selectedHandId, handEnabled, onHand, onSkill, h
 
   const header = (
     <div
+      className={`turn-header${isTurn ? ' active' : ''}${!isTurn && !over ? ' waiting' : ''}`}
       style={{
         position: 'relative', background: fam.colors.border, color: '#fff', borderRadius: 20, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12,
-        boxShadow: isTurn ? '0 0 0 4px #ffc700' : undefined,
       }}
     >
-      <div style={{ width: 68, height: 68, borderRadius: 34, background: fam.colors.tile, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flex: '0 0 auto' }}>
-        <Chara kind="K" family={famId} crop="bust" size={66} title={fam.lord} />
+      {isTurn && <span className="turn-halo" />}
+      <div style={{ position: 'relative', width: 68, height: 68, flex: '0 0 auto' }}>
+        {isTurn && <span className="turn-face-halo" />}
+        <div style={{ position: 'relative', width: 68, height: 68, borderRadius: 34, background: fam.colors.tile, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', boxShadow: isTurn ? '0 0 0 4px #ffc700' : undefined }}>
+          <Chara kind="K" family={famId} crop="bust" size={66} title={fam.lord} />
+        </div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
         <span style={{ fontSize: fam.army.length > 3 ? 21 : 26, fontWeight: 800, lineHeight: 1.1 }}>{fam.army}</span>
@@ -541,7 +552,7 @@ function SidePanel({ side, game, selectedHandId, handEnabled, onHand, onSkill, h
           {side === 'sente' ? '先手' : '後手'} ・ 大将 {fam.lord}
         </span>
       </div>
-      {isTurn && <span style={{ position: 'absolute', right: 12, top: -10, padding: '3px 10px', borderRadius: 12, background: '#ffc700', color: '#2b2b2b', fontSize: 13, fontWeight: 800, border: '2px solid #fff' }}>いまの番</span>}
+      {isTurn && <span key={`badge-${game.moveCount}`} className="turn-badge">いまの番!</span>}
       {game.shield === side && <span style={{ position: 'absolute', left: 12, top: -10, padding: '3px 10px', borderRadius: 12, background: '#7fd3ff', color: '#13324a', fontSize: 13, fontWeight: 800, border: '2px solid #fff' }}>守り中</span>}
     </div>
   );
