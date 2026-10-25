@@ -17,11 +17,20 @@
 
 * { box-sizing: border-box; }
 html, body, #root { margin: 0; height: 100%; }
-body { background: #9fd3f2; overflow: hidden; }
+html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
+body { background: #9fd3f2; overflow: hidden; overscroll-behavior: none; }
 button { font-family: inherit; color: inherit; }
 
-.viewport { width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; }
-.stage { position: absolute; left: 0; top: 0; width: 1280px; height: 800px; transform-origin: 0 0; overflow: hidden; user-select: none; -webkit-tap-highlight-color: transparent; }
+.viewport {
+  width: 100vw; height: 100vh; height: 100dvh; display: flex; align-items: center; justify-content: center;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+.stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; overflow: hidden; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+
+/* 縦向きのスマホ: よこに してね */
+.rotate-notice { position: fixed; inset: 0; z-index: 100; background: var(--sky); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; text-align: center; }
+.rotate-phone { animation: rotate-phone 2.4s ease-in-out infinite; }
+@keyframes rotate-phone { 0%, 25% { transform: rotate(0deg); } 55%, 85% { transform: rotate(-90deg); } 100% { transform: rotate(0deg); } }
 .screen { position: absolute; inset: 0; }
 .screen-paper { background: var(--paper); display: flex; flex-direction: column; }
 .screen-sky { background: var(--sky); }
@@ -39,7 +48,7 @@ button { font-family: inherit; color: inherit; }
 .btn:focus-visible, .cell:focus-visible, .hand-tile:focus-visible { outline: 4px solid var(--move); outline-offset: 2px; }
 
 /* 景色 */
-.sun { position: absolute; right: 150px; top: 64px; width: 120px; height: 120px; border-radius: 60px; background: #ffd45c; }
+.sun { position: absolute; width: 120px; height: 120px; border-radius: 60px; background: #ffd45c; }
 .cloud { position: absolute; background: #fff; border-radius: 999px; }
 .hill { position: absolute; border-radius: 50%; }
 
@@ -108,8 +117,8 @@ button { font-family: inherit; color: inherit; }
 }
 
 /* 大名選択の地図 */
-.map-chip { position: absolute; width: 106px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0; border: none; background: transparent; cursor: pointer; transition: transform 0.15s; }
-.map-chip.picked { transform: scale(1.18); }
+.map-chip { position: absolute; width: 106px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0; border: none; background: transparent; cursor: pointer; transition: transform 0.15s; transform: scale(var(--chip-scale, 1)); }
+.map-chip.picked { transform: scale(calc(var(--chip-scale, 1) * 1.18)); }
 .map-chip:hover .map-face { transform: translateY(-3px); }
 .map-chip:focus-visible { outline: 4px solid var(--move); outline-offset: 2px; border-radius: 16px; }
 .map-face-wrap { position: relative; width: 64px; height: 64px; }

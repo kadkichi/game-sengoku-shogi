@@ -4,6 +4,7 @@ import { ISLANDS, MAP_H, MAP_POINTS, MAP_W } from '../data/map';
 import type { Side, Variant } from '../engine/types';
 import { play } from '../audio/sound';
 import { Chara } from './Chara';
+import { useStage } from './Stage';
 
 interface Props {
   initial: Record<Side, FamilyId>;
@@ -16,16 +17,29 @@ const SIDE_NAME: Record<Side, string> = { sente: '先手', gote: '後手' };
 const SIDE_SUB: Record<Side, string> = { sente: 'さきに うごく', gote: 'あとから うごく' };
 const SIDE_COLOR: Record<Side, string> = { sente: '#D0392E', gote: '#2E5E8C' };
 
-const LINES = FAMILY_IDS.map((id) => {
-  const { home, icon } = MAP_POINTS[id];
-  return `M${home[0]} ${home[1]} L${icon[0]} ${icon[1]}`;
-}).join(' ');
+/** スマホでは顔アイコンを大きくするので、地図の上下の端で切れないよう内側に寄せる */
+const iconPos = (id: FamilyId, compact: boolean): [number, number] => {
+  const [x, y] = MAP_POINTS[id].icon;
+  return compact ? [x, Math.max(125, Math.min(y, 585))] : [x, y];
+};
 
 export function SelectScreen({ initial, initialVariant, onBack, onStart }: Props) {
   const [picked, setPicked] = useState(initial);
   const [variant, setVariant] = useState<Variant>(initialVariant);
   /** いま地図で選んでいる側 */
   const [active, setActive] = useState<Side>('sente');
+  const { compact, h } = useStage();
+  const topH = compact ? 56 : 68;
+  const pad = compact ? 12 : 16;
+  /** 地図は画面の高さに収まるよう縮める (ふつうの画面では等倍) */
+  const mapScale = (h - topH - pad * 2) / MAP_H;
+  /** スマホでは顔アイコンを大きくして押しやすくする */
+  const chipScale = compact ? 1.3 : 1;
+  const lines = FAMILY_IDS.map((id) => {
+    const [hx, hy] = MAP_POINTS[id].home;
+    const [ix, iy] = iconPos(id, compact);
+    return `M${hx} ${hy} L${ix} ${iy}`;
+  }).join(' ');
 
   const pick = (id: FamilyId) => {
     play('select');
@@ -44,22 +58,23 @@ export function SelectScreen({ initial, initialVariant, onBack, onStart }: Props
 
   return (
     <div className="screen screen-paper">
-      <div style={{ height: 68, flex: '0 0 auto', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff', borderBottom: '2px solid var(--line)' }}>
-        <button className="btn btn-ghost" style={{ height: 46, borderRadius: 23, fontSize: 17 }} onClick={onBack}>
+      <div style={{ height: topH, flex: '0 0 auto', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff', borderBottom: '2px solid var(--line)' }}>
+        <button className="btn btn-ghost" style={{ height: compact ? 42 : 46, borderRadius: 23, fontSize: 17 }} onClick={onBack}>
           ← もどる
         </button>
-        <h1 className="display" style={{ margin: 0, fontSize: 32, letterSpacing: '0.1em' }}>
+        <h1 className="display" style={{ margin: 0, fontSize: compact ? 26 : 32, letterSpacing: '0.1em' }}>
           地図から 大名を えらぼう
         </h1>
         <div style={{ width: 128, fontSize: 13, fontWeight: 700, color: 'var(--muted)', textAlign: 'right' }}>おなじ家でも いいよ</div>
       </div>
 
-      <div style={{ flex: '1 1 auto', display: 'flex', gap: 24, padding: 16 }}>
+      <div style={{ flex: '1 1 auto', display: 'flex', gap: compact ? 16 : 24, padding: pad, minHeight: 0 }}>
         {/* 地図 */}
+        <div style={{ position: 'relative', width: MAP_W * mapScale, height: MAP_H * mapScale, flex: '0 0 auto' }}>
         <div
           style={{
-            position: 'relative', width: MAP_W, height: MAP_H, flex: '0 0 auto', borderRadius: 28, overflow: 'hidden',
-            background: '#bfe3f7', border: '3px solid #8cc4e3',
+            position: 'absolute', left: 0, top: 0, width: MAP_W, height: MAP_H, borderRadius: 28, overflow: 'hidden',
+            background: '#bfe3f7', border: '3px solid #8cc4e3', transform: `scale(${mapScale})`, transformOrigin: '0 0',
           }}
         >
           <svg width={MAP_W} height={MAP_H} viewBox={`0 0 ${MAP_W} ${MAP_H}`} aria-hidden="true" style={{ position: 'absolute', left: -3, top: -3 }}>
@@ -81,7 +96,7 @@ export function SelectScreen({ initial, initialVariant, onBack, onStart }: Props
                 <path key={d} d={d} />
               ))}
             </g>
-            <path d={LINES} fill="none" stroke="#3a1f14" strokeWidth={2.5} strokeDasharray="2 6" strokeLinecap="round" />
+            <path d={lines} fill="none" stroke="#3a1f14" strokeWidth={2.5} strokeDasharray="2 6" strokeLinecap="round" />
             {FAMILY_IDS.map((id) => {
               const [x, y] = MAP_POINTS[id].home;
               return <circle key={id} cx={x} cy={y} r={7.5} fill={FAMILIES[id].colors.border} stroke="#fff" strokeWidth={3} />;
@@ -96,15 +111,16 @@ export function SelectScreen({ initial, initialVariant, onBack, onStart }: Props
             }}
           >
             <span style={{ width: 14, height: 14, borderRadius: 7, background: SIDE_COLOR[active] }} />
-            <span style={{ fontSize: 17, fontWeight: 800 }}>{SIDE_NAME[active]}の 大名を 地図から えらんでね</span>
-            <button className="btn btn-ghost" style={{ height: 34, fontSize: 13, padding: '0 12px' }} onClick={pickRandom}>
+            <span style={{ fontSize: compact ? 23 : 17, fontWeight: 800 }}>{SIDE_NAME[active]}の 大名を えらんでね</span>
+            <button className="btn btn-ghost" style={{ height: compact ? 46 : 34, fontSize: compact ? 19 : 13, padding: '0 14px' }} onClick={pickRandom}>
               おまかせ
             </button>
           </div>
 
           {FAMILY_IDS.map((id) => {
             const f = FAMILIES[id];
-            const { icon, place } = MAP_POINTS[id];
+            const { place } = MAP_POINTS[id];
+            const icon = iconPos(id, compact);
             const isS = picked.sente === id;
             const isG = picked.gote === id;
             const on = isS || isG;
@@ -125,7 +141,7 @@ export function SelectScreen({ initial, initialVariant, onBack, onStart }: Props
                 aria-pressed={on}
                 aria-label={`${f.name} (${f.lord}、${place})${on ? ` ${picked2}に えらばれている` : ''}`}
                 onClick={() => pick(id)}
-                style={{ left: icon[0] - 56, top: icon[1] - 46, zIndex: on ? 3 : 1 }}
+                style={{ left: icon[0] - 56, top: icon[1] - 46, zIndex: on ? 3 : 1, ['--chip-scale' as string]: chipScale }}
               >
                 <span className="map-face-wrap">
                   {sides.map((s, i) => (
@@ -151,9 +167,10 @@ export function SelectScreen({ initial, initialVariant, onBack, onStart }: Props
             );
           })}
         </div>
+        </div>
 
         {/* 右: 選んだ大名 */}
-        <aside style={{ flex: '1 1 auto', display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
+        <aside style={{ flex: '1 1 auto', display: 'flex', flexDirection: 'column', gap: compact ? 10 : 12, minWidth: 0 }}>
           <div role="radiogroup" aria-label="いま えらんでいる 側" className="segment">
             {(['sente', 'gote'] as Side[]).map((side) => {
               const on = active === side;
@@ -167,7 +184,7 @@ export function SelectScreen({ initial, initialVariant, onBack, onStart }: Props
                     play('tap');
                     setActive(side);
                   }}
-                  style={{ flex: '1 1 0', height: 44, borderRadius: 20, fontSize: 16, background: on ? SIDE_COLOR[side] : 'transparent', color: on ? '#fff' : SIDE_COLOR[side] }}
+                  style={{ flex: '1 1 0', height: 44, borderRadius: 20, fontSize: compact ? 18 : 16, background: on ? SIDE_COLOR[side] : 'transparent', color: on ? '#fff' : SIDE_COLOR[side] }}
                 >
                   {SIDE_NAME[side]}を えらぶ
                 </button>
@@ -175,9 +192,11 @@ export function SelectScreen({ initial, initialVariant, onBack, onStart }: Props
             })}
           </div>
 
+          <div style={compact ? { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 } : { display: 'flex', flexDirection: 'column', gap: 12 }}>
           {(['sente', 'gote'] as Side[]).map((side) => {
             const f = FAMILIES[picked[side]];
             const on = active === side;
+            const face = compact ? 64 : 84;
             return (
               <button
                 key={side}
@@ -185,7 +204,7 @@ export function SelectScreen({ initial, initialVariant, onBack, onStart }: Props
                 aria-label={`${SIDE_NAME[side]} ${f.name}。押すと ${SIDE_NAME[side]}を えらびなおせる`}
                 onClick={() => setActive(side)}
                 style={{
-                  background: '#fff', borderRadius: 20, padding: '12px 14px', flexDirection: 'column', alignItems: 'stretch', gap: 8, textAlign: 'left', fontWeight: 400,
+                  background: '#fff', borderRadius: 20, padding: compact ? '10px 10px' : '12px 14px', flexDirection: 'column', alignItems: 'stretch', justifyContent: 'flex-start', gap: compact ? 6 : 8, textAlign: 'left', fontWeight: 400,
                   border: on ? `4px solid ${SIDE_COLOR[side]}` : '2px solid var(--line)',
                 }}
               >
@@ -193,22 +212,24 @@ export function SelectScreen({ initial, initialVariant, onBack, onStart }: Props
                   <span style={{ display: 'inline-flex', alignItems: 'center', height: 28, padding: '0 12px', borderRadius: 14, fontSize: 15, fontWeight: 800, color: '#fff', background: SIDE_COLOR[side] }}>
                     {SIDE_NAME[side]}
                   </span>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--muted)' }}>{on ? '地図で えらんでいるよ' : SIDE_SUB[side]}</span>
+                  {!compact && <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--muted)' }}>{on ? '地図で えらんでいるよ' : SIDE_SUB[side]}</span>}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                  <span style={{ width: 84, height: 84, flex: '0 0 auto', borderRadius: 42, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: f.colors.tile, border: `4px solid ${f.colors.border}` }}>
-                    <Chara kind="K" family={f.id} crop="bust" size={78} title={f.lord} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: compact ? 8 : 14 }}>
+                  <span style={{ width: face, height: face, flex: '0 0 auto', borderRadius: face / 2, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: f.colors.tile, border: `4px solid ${f.colors.border}` }}>
+                    <Chara kind="K" family={f.id} crop="bust" size={face - 6} title={f.lord} />
                   </span>
                   <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-                    <span className="label">
-                      {f.name} の 大将 ({MAP_POINTS[f.id].place})
+                    <span className="label" style={compact ? { fontSize: 14 } : undefined}>
+                      {compact ? f.name : `${f.name} の 大将 (${MAP_POINTS[f.id].place})`}
                     </span>
-                    <span style={{ fontSize: f.lord.length > 4 ? 22 : 26, fontWeight: 800, lineHeight: 1.1 }}>{f.lord}</span>
+                    <span style={{ fontSize: compact ? (f.lord.length > 4 ? 18 : 22) : f.lord.length > 4 ? 22 : 26, fontWeight: 800, lineHeight: 1.1 }}>{f.lord}</span>
                   </span>
                 </div>
                 <span style={{ background: '#fff7e0', borderRadius: 14, padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <span className="label-gold">ひっさつわざ「{f.skill.name}」</span>
-                  <span style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.45, color: '#4a3b2c' }}>
+                  <span className="label-gold" style={compact ? { fontSize: 15 } : undefined}>
+                    {compact ? f.skill.name : `ひっさつわざ「${f.skill.name}」`}
+                  </span>
+                  <span style={{ fontSize: compact ? 14 : 13, fontWeight: 700, lineHeight: 1.45, color: '#4a3b2c' }}>
                     {f.skill.short}
                     {variant === 'small' && f.skill.smallNote ? ` ※${f.skill.smallNote}` : ''}
                   </span>
@@ -216,6 +237,7 @@ export function SelectScreen({ initial, initialVariant, onBack, onStart }: Props
               </button>
             );
           })}
+          </div>
 
           <div role="radiogroup" aria-label="あそびかた" className="segment">
             {(['small', 'large'] as Variant[]).map((v) => {
@@ -236,10 +258,10 @@ export function SelectScreen({ initial, initialVariant, onBack, onStart }: Props
                     background: on ? 'var(--blue)' : 'transparent', color: on ? '#fff' : 'var(--blue)',
                   }}
                 >
-                  <span style={{ fontSize: 17 }}>
+                  <span style={{ fontSize: compact ? 19 : 17 }}>
                     {MODES[v].label} <span style={{ fontSize: 12, fontWeight: 700 }}>{MODES[v].size}</span>
                   </span>
-                  <span style={{ fontSize: 11, fontWeight: 700 }}>{v === 'small' ? 'すぐ おわる' : 'じっくり たたかう'}</span>
+                  {!compact && <span style={{ fontSize: 11, fontWeight: 700 }}>{v === 'small' ? 'すぐ おわる' : 'じっくり たたかう'}</span>}
                 </button>
               );
             })}
@@ -247,7 +269,7 @@ export function SelectScreen({ initial, initialVariant, onBack, onStart }: Props
 
           <button
             className="btn btn-primary"
-            style={{ marginTop: 'auto', height: 68, borderRadius: 34, fontSize: 30, letterSpacing: '0.15em', paddingLeft: '0.15em' }}
+            style={{ marginTop: 'auto', height: compact ? 60 : 68, borderRadius: 34, fontSize: compact ? 28 : 30, letterSpacing: '0.15em', paddingLeft: '0.15em' }}
             onClick={() => {
               play('skill');
               onStart(picked, variant);

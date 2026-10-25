@@ -75,11 +75,12 @@ export function BattleScreen({ families, variant, onFinish, onQuit }: Props) {
   const [muted, setMutedState] = useState(isMuted());
   const [confirmQuit, setConfirmQuit] = useState(false);
 
-  const { scale, ref: stageRef } = useStage();
+  const { scale, ref: stageRef, compact } = useStage();
   const cellRefs = useRef(new Map<string, HTMLElement>());
   const handRefs = useRef<Partial<Record<Side, HTMLElement | null>>>({});
 
-  const cell = CELL[variant];
+  /** スマホの横向きでは、画面の高さに盤が収まるようマスを小さくする */
+  const cell = compact ? (variant === 'small' ? 96 : 64) : CELL[variant];
   const { cols, rows } = game;
   const over = game.winner !== null || game.draw;
   const turnFam = FAMILIES[game.families[game.turn]];
@@ -369,6 +370,7 @@ export function BattleScreen({ families, variant, onFinish, onQuit }: Props) {
   const panel = (side: Side) => (
     <SidePanel
       side={side}
+      compact={compact}
       game={game}
       selectedHandId={sel?.type === 'hand' ? sel.pieceId : null}
       handEnabled={handEnabled(side)}
@@ -382,8 +384,8 @@ export function BattleScreen({ families, variant, onFinish, onQuit }: Props) {
 
   return (
     <div className="screen screen-paper">
-      <div style={{ height: 64, flex: '0 0 auto', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff', borderBottom: '2px solid var(--line)' }}>
-        <span className="display" style={{ fontSize: 26, width: 260 }}>
+      <div style={{ height: compact ? 52 : 64, flex: '0 0 auto', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff', borderBottom: '2px solid var(--line)' }}>
+        <span className="display" style={{ fontSize: compact ? 22 : 26, width: 260 }}>
           戦国将棋
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }} aria-live="polite">
@@ -419,10 +421,10 @@ export function BattleScreen({ families, variant, onFinish, onQuit }: Props) {
         </div>
       </div>
 
-      <div style={{ flex: '1 1 auto', display: 'flex', gap: 24, padding: '16px 24px' }}>
+      <div style={{ flex: '1 1 auto', display: 'flex', gap: compact ? 16 : 24, padding: compact ? '10px 16px' : '16px 24px', minHeight: 0 }}>
         {panel('gote')}
         <main style={{ flex: '1 1 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-          <div style={{ height: 40 }} aria-live="polite">
+          <div style={{ height: compact ? 36 : 40 }} aria-live="polite">
             {toast ? (
               <div key={toast.key} className="toast">
                 <span className="toast-label">{toast.label}</span>
@@ -443,7 +445,7 @@ export function BattleScreen({ families, variant, onFinish, onQuit }: Props) {
               {cells}
             </div>
           </div>
-          <div style={{ height: 44, display: 'flex', alignItems: 'center', gap: 12, fontSize: 16, fontWeight: 700 }}>
+          <div style={{ height: compact ? 40 : 44, display: 'flex', alignItems: 'center', gap: 12, fontSize: compact ? 17 : 16, fontWeight: 700, textAlign: 'center' }}>
             <span>{hint}</span>
             {hintButtons.map((b) => (
               <button key={b.label} className="btn btn-ghost" style={{ fontSize: 14 }} onClick={b.onClick}>
@@ -458,10 +460,10 @@ export function BattleScreen({ families, variant, onFinish, onQuit }: Props) {
       {banner && (
         <div key={banner.key} className="skill-banner">
           <div className="skill-banner-inner" style={{ background: FAMILIES[banner.family].colors.tile }}>
-            <Chara kind="K" family={banner.family} size={150} />
+            <Chara kind="K" family={banner.family} size={compact ? 120 : 150} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <span style={{ fontSize: 20, fontWeight: 800, color: '#8a5a00' }}>{FAMILIES[banner.family].skill.phrase}</span>
-              <span className="display" style={{ fontSize: 64, lineHeight: 1.1 }}>
+              <span className="display" style={{ fontSize: compact ? 52 : 64, lineHeight: 1.1 }}>
                 {FAMILIES[banner.family].skill.name}
               </span>
             </div>
@@ -502,6 +504,7 @@ function FlyingPiece({ ghost, onDone }: { ghost: Ghost; onDone: () => void }) {
 
 interface PanelProps {
   side: Side;
+  compact: boolean;
   game: GameState;
   selectedHandId: string | null;
   handEnabled: boolean;
@@ -510,7 +513,10 @@ interface PanelProps {
   handRef: (el: HTMLElement | null) => void;
 }
 
-function SidePanel({ side, game, selectedHandId, handEnabled, onHand, onSkill, handRef }: PanelProps) {
+function SidePanel({ side, compact, game, selectedHandId, handEnabled, onHand, onSkill, handRef }: PanelProps) {
+  /** 顔アイコンと持ち駒タイルの大きさ */
+  const face = compact ? 56 : 68;
+  const hs = compact ? 64 : 72;
   const famId = game.families[side];
   const fam = FAMILIES[famId];
   const over = game.winner !== null || game.draw;
@@ -540,15 +546,15 @@ function SidePanel({ side, game, selectedHandId, handEnabled, onHand, onSkill, h
       }}
     >
       {isTurn && <span className="turn-halo" />}
-      <div style={{ position: 'relative', width: 68, height: 68, flex: '0 0 auto' }}>
+      <div style={{ position: 'relative', width: face, height: face, flex: '0 0 auto' }}>
         {isTurn && <span className="turn-face-halo" />}
-        <div style={{ position: 'relative', width: 68, height: 68, borderRadius: 34, background: fam.colors.tile, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', boxShadow: isTurn ? '0 0 0 4px #ffc700' : undefined }}>
-          <Chara kind="K" family={famId} crop="bust" size={66} title={fam.lord} />
+        <div style={{ position: 'relative', width: face, height: face, borderRadius: face / 2, background: fam.colors.tile, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', boxShadow: isTurn ? '0 0 0 4px #ffc700' : undefined }}>
+          <Chara kind="K" family={famId} crop="bust" size={face - 2} title={fam.lord} />
         </div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-        <span style={{ fontSize: fam.army.length > 3 ? 21 : 26, fontWeight: 800, lineHeight: 1.1 }}>{fam.army}</span>
-        <span style={{ fontSize: 13, fontWeight: 700 }}>
+        <span style={{ fontSize: fam.army.length > 3 ? 21 : compact ? 24 : 26, fontWeight: 800, lineHeight: 1.1 }}>{fam.army}</span>
+        <span style={{ fontSize: compact ? 14 : 13, fontWeight: 700 }}>
           {side === 'sente' ? '先手' : '後手'} ・ 大将 {fam.lord}
         </span>
       </div>
@@ -558,23 +564,34 @@ function SidePanel({ side, game, selectedHandId, handEnabled, onHand, onSkill, h
   );
 
   const skill = (
-    <div className="card" style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 6, borderColor: skillEnabled ? '#f5c542' : undefined, borderWidth: skillEnabled ? 3 : 2 }}>
-      <span className="label-gold">ひっさつわざ (1かいだけ)</span>
-      <span style={{ fontSize: 22, fontWeight: 800 }}>{fam.skill.name}</span>
-      <span style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.5, color: '#4a3b2c' }}>
-        {fam.skill.short}
-        {game.variant === 'small' && fam.skill.smallNote ? ` ※${fam.skill.smallNote}` : ''}
+    <div
+      className="card"
+      title={fam.skill.short}
+      style={{ padding: compact ? '10px 14px' : '14px 16px', display: 'flex', flexDirection: 'column', gap: compact ? 4 : 6, borderColor: skillEnabled ? '#f5c542' : undefined, borderWidth: skillEnabled ? 3 : 2 }}
+    >
+      <span className="label-gold" style={compact ? { fontSize: 14 } : undefined}>
+        ひっさつわざ{compact ? '' : ' (1かいだけ)'}
       </span>
-      <button className="btn btn-primary" disabled={!skillEnabled} onClick={onSkill} style={{ marginTop: 4, height: 52, borderRadius: 26, fontSize: skillEnabled ? 20 : 17, letterSpacing: '0.05em' }}>
+      <span style={{ fontSize: compact ? 21 : 22, fontWeight: 800, lineHeight: 1.2 }}>{fam.skill.name}</span>
+      {/* スマホでは説明を省く (技を使うと、盤の下の案内で何をするか出る) */}
+      {!compact && (
+        <span style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.5, color: '#4a3b2c' }}>
+          {fam.skill.short}
+          {game.variant === 'small' && fam.skill.smallNote ? ` ※${fam.skill.smallNote}` : ''}
+        </span>
+      )}
+      <button className="btn btn-primary" disabled={!skillEnabled} onClick={onSkill} style={{ marginTop: 4, height: compact ? 48 : 52, borderRadius: 26, fontSize: skillEnabled ? 20 : 17, letterSpacing: '0.05em' }}>
         {skillLabel}
       </button>
     </div>
   );
 
   const hand = (
-    <div ref={handRef} className="card" style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12, flex: '1 1 auto' }}>
-      <span className="label">もちごま (寝返った駒)</span>
-      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+    <div ref={handRef} className="card" style={{ padding: compact ? '10px 12px' : '14px 16px', display: 'flex', flexDirection: 'column', gap: compact ? 8 : 12, flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }}>
+      <span className="label" style={compact ? { fontSize: 14 } : undefined}>
+        もちごま{compact ? '' : ' (寝返った駒)'}
+      </span>
+      <div style={{ display: 'flex', gap: compact ? 10 : 14, flexWrap: 'wrap' }}>
         {[...groups.values()].map((ps) => {
           const p = ps[0];
           const selected = ps.some((x) => x.id === selectedHandId);
@@ -583,18 +600,18 @@ function SidePanel({ side, game, selectedHandId, handEnabled, onHand, onSkill, h
             <div key={p.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
               <button
                 className={`hand-tile${selected ? ' selected' : ''}`}
-                style={{ background: fam.colors.tile, borderColor: fam.colors.border }}
+                style={{ background: fam.colors.tile, borderColor: fam.colors.border, width: hs, height: hs }}
                 disabled={!handEnabled}
                 aria-label={`もちごま ${p.name} ${ps.length}まい`}
                 onClick={() => onHand(side, p.id)}
               >
-                <Chara kind={p.kind} family={famId} crop="bust" size={46} special={specialOf(p.name, p.originFamily)} />
+                <Chara kind={p.kind} family={famId} crop="bust" size={Math.round(hs * 0.64)} special={specialOf(p.name, p.originFamily)} />
                 <span style={{ fontSize: p.name.length > 4 ? 9 : 11, fontWeight: 800, lineHeight: 1, color: '#3a2a1f', whiteSpace: 'nowrap' }}>{p.name}</span>
                 {directions(p, game.variant).map(([dx, dy]) => (
                   <span
                     key={`${dx},${dy}`}
                     className="dir-dot"
-                    style={{ width: 10, height: 10, left: 36 + dx * 36 - 5, top: 36 + dy * 36 - 5, background: fam.colors.border }}
+                    style={{ width: 10, height: 10, left: hs / 2 + dx * (hs / 2) - 5, top: hs / 2 + dy * (hs / 2) - 5, background: fam.colors.border }}
                   />
                 ))}
               </button>
@@ -609,12 +626,12 @@ function SidePanel({ side, game, selectedHandId, handEnabled, onHand, onSkill, h
         })}
       </div>
       {groups.size === 0 && <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--muted)' }}>まだ ないよ</span>}
-      {groups.size > 0 && handEnabled && <span style={{ marginTop: 'auto', fontSize: 13, fontWeight: 700, color: 'var(--muted)' }}>タップすると 打てるマスが 光るよ</span>}
+      {groups.size > 0 && handEnabled && !compact && <span style={{ marginTop: 'auto', fontSize: 13, fontWeight: 700, color: 'var(--muted)' }}>タップすると 打てるマスが 光るよ</span>}
     </div>
   );
 
   return (
-    <aside style={{ width: 300, flex: '0 0 auto', display: 'flex', flexDirection: 'column', gap: 12 }} aria-label={`${fam.army} (${side === 'sente' ? '先手' : '後手'})`}>
+    <aside style={{ width: compact ? 250 : 300, flex: '0 0 auto', display: 'flex', flexDirection: 'column', gap: 12 }} aria-label={`${fam.army} (${side === 'sente' ? '先手' : '後手'})`}>
       {top ? (
         <>
           {header}
