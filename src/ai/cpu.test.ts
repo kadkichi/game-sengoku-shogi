@@ -87,6 +87,21 @@ describe('CPU', () => {
     }
   });
 
+  it('weak: うっかりも多い (タダで取れる駒を見のがすことがある)', () => {
+    const s = custom(
+      [
+        [P(2, 3), piece('sente', 'G')],
+        [P(2, 2), piece('gote', 'S')],
+        [P(0, 5), piece('sente', 'K')],
+        [P(4, 0), piece('gote', 'K')],
+      ],
+      { sente: 'oda', gote: 'takeda' },
+    );
+    let missed = 0;
+    for (let i = 0; i < 40; i++) if (play(s, 'weak', seeded(i * 7 + 3)).after.hands.sente.length === 0) missed++;
+    expect(missed).toBeGreaterThan(5);
+  });
+
   it('normal: タダで取れる駒は取る', () => {
     const s = custom(
       [

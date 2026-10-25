@@ -70,7 +70,8 @@ interface Ghost {
 let seq = 0;
 
 /** CPU の操作と操作のあいだの間 (ms) */
-const CPU_MIN_THINK = 700;
+/** CPU が「かんがえ中…」を見せる最短の時間。あなたの手のアニメーションが終わってから数える */
+const CPU_MIN_THINK = 900;
 const CPU_STEP = 650;
 const CPU_AFTER_SKILL = 1500;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -305,6 +306,9 @@ export function BattleScreen({ families, variant, cpu, onFinish, onQuit }: Props
     let cancelled = false;
     setSel(null);
     (async () => {
+      // あなたの手のアニメーション (すべる・戦う) が終わるのを待ってから考えはじめる
+      await sleep(Math.max(0, busyUntil.current - performance.now()));
+      if (cancelled) return;
       setCpuThinking(true);
       const started = performance.now();
       const actions = await think(gameRef.current, cpu.level);

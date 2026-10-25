@@ -35,7 +35,7 @@ export interface Motion {
 /** 盤上の駒。家の色の枠、胸から上のキャラ、武将名、動ける方向の三角 */
 export function PieceTile({ piece, family, variant, cell, selected, target, shooter, shielded, justPromoted, motion }: Props) {
   const c = FAMILIES[family].colors;
-  /** 大将は金色のタイルに、家紋つきの「大将」のたすきをかけて、ひと目でわかるようにする */
+  /** 大将は金色のタイルと金色の縁取り、右上に家紋、下に名前のたすきで、ひと目でわかるようにする */
   const isLord = piece.kind === 'K';
   /** マスが小さいとき (スマホの 5×6) は名前を出さず、絵を大きくする。名前は選んだときに盤の下の案内に出る */
   const showName = cell >= 80 && !isLord;
@@ -61,7 +61,7 @@ export function PieceTile({ piece, family, variant, cell, selected, target, shoo
         className={`${cls}${isLord ? ' lord' : ''}`}
         style={{
           background: isLord ? '#FFE38A' : c.tile,
-          borderColor: c.border,
+          borderColor: isLord ? '#B8860B' : c.border,
           borderWidth: isLord ? 4 : undefined,
           width: cell - 12,
           height: cell - 12,
@@ -81,10 +81,22 @@ export function PieceTile({ piece, family, variant, cell, selected, target, shoo
           </span>
         )}
         {isLord && (
-          <span className="lord-sash" style={{ height: sashH, fontSize: Math.round(sashH * 0.68), borderRadius: sashH / 2 }}>
-            <Crest family={family} size={sashH - 2} />
-            大将
-          </span>
+          <>
+            <span className="lord-crest" style={{ width: Math.round(cell * 0.24), height: Math.round(cell * 0.24) }}>
+              <Crest family={family} size={Math.round(cell * 0.24)} />
+            </span>
+            <span
+              className="lord-sash"
+              style={{
+                height: sashH,
+                // 名前が長くても、たすきが駒の幅から大きくはみ出さないように文字を小さくする
+                fontSize: Math.max(8, Math.min(Math.round(sashH * 0.68), Math.floor((cell - 32) / piece.name.length))),
+                borderRadius: sashH / 2,
+              }}
+            >
+              {piece.name}
+            </span>
+          </>
         )}
         {piece.promoted && <span className="rank-badge">{piece.kind === 'P' ? '出世' : '武勲'}</span>}
       </div>

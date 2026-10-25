@@ -31,7 +31,7 @@ const pieceValue = (state: GameState, p: Piece) => (p.promoted ? PROMOTED : VALU
  * 局面の点数 (side から見て)。
  * 大将を取った・取られたは決着として大きく、ほかは駒の損得と少しの位置の良し悪し
  */
-export function evaluate(state: GameState, side: Side): number {
+export function evaluate(state: GameState, side: Side, careful = true): number {
   const opp = opponent(side);
   if (state.winner === side) return WIN;
   if (state.winner === opp) return -WIN;
@@ -57,7 +57,8 @@ export function evaluate(state: GameState, side: Side): number {
     if (!state.skillUsed[s]) score += sign * SKILL_KEPT;
   }
 
-  // 次に指す側が、相手の大将を取れる位置にいるか
+  // 次に指す側が、相手の大将を取れる位置にいるか (よわい CPU は気にしない)
+  if (!careful) return score;
   const mover = state.turn;
   const other = opponent(mover);
   if (isKingInDanger(state, other)) score += (mover === side ? 1 : -1) * 800;
@@ -85,7 +86,7 @@ function searchRoot(state: GameState): GameState {
 
 /**
  * CPU の手を選ぶ。返り値は、その手番に行う操作の並び。
- * - weak:   1手だけ読み、大きなばらつきを入れる (取れる大将は取るが、うっかりも多い)
+ * - weak:   半分くらいは適当に指す。残りも1手だけ読み、大将が狙われていても気にしない (取れる大将は取る)
  * - normal: 自分の手と相手の返しの2手を読む
  */
 export function chooseTurn(state: GameState, level: CpuLevel, rng: () => number = Math.random): Action[] {
@@ -99,10 +100,16 @@ export function chooseTurn(state: GameState, level: CpuLevel, rng: () => number 
   if (winning) return winning.actions;
 
   if (level === 'weak') {
-    let best: Turn = turns[0];
+    // 必殺技はたまにしか使わない
+    const plain = turns.filter((t) => t.actions[0].type !== 'activateSkill');
+    const pool = plain.length > 0 && rng() < 0.75 ? plain : turns;
+    // 半分くらいは、あまり考えずに適当に指す
+    if (rng() < 0.45) return pool[Math.floor(rng() * pool.length)].actions;
+    // 残りは1手だけ読むが、大将が狙われているかは気にせず、ばらつきも大きい
+    let best: Turn = pool[0];
     let bestScore = -Infinity;
-    for (const t of turns) {
-      const s = evaluate(t.result, side) + noise(rng, 3);
+    for (const t of pool) {
+      const s = evaluate(t.result, side, false) + noise(rng, 5);
       if (s > bestScore) {
         bestScore = s;
         best = t;
