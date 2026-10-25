@@ -15,34 +15,79 @@ const rad = (deg: number) => (deg * Math.PI) / 180;
 const pt = (cx: number, cy: number, r: number, deg: number) =>
   `${(cx + r * Math.sin(rad(deg))).toFixed(1)} ${(cy - r * Math.cos(rad(deg))).toFixed(1)}`;
 
-/** 家紋 (原点中心、半径およそ7) */
+/** 原点中心の点 (角度は上が 0 度、時計回り) */
+const at = (r: number, deg: number): [number, number] => [r * Math.sin(rad(deg)), -r * Math.cos(rad(deg))];
+const p2 = ([x, y]: [number, number]) => `${x.toFixed(2)} ${y.toFixed(2)}`;
+/** 時計回りの四角 (反時計回りの円の中に描くと穴になる) */
+const squareHole = (x: number, y: number, h: number) => `M${x - h} ${y - h} L${x + h} ${y - h} L${x + h} ${y + h} L${x - h} ${y + h} Z`;
+/** 外向きのハート形の葉 (葵・片喰)。ref を中心に deg の向き */
+const heartLeaf = (deg: number, inner: number, outer: number, width: number) => {
+  const notch = at(inner, deg);
+  const tip = at(outer, deg);
+  const mid = (inner + outer) / 2;
+  return (
+    `M${p2(notch)} Q${p2(at(inner + 0.2, deg - width * 1.6))} ${p2(at(mid, deg - width))} ` +
+    `Q${p2(at(outer - 0.6, deg - width * 0.6))} ${p2(tip)} ` +
+    `Q${p2(at(outer - 0.6, deg + width * 0.6))} ${p2(at(mid, deg + width))} ` +
+    `Q${p2(at(inner + 0.2, deg + width * 1.6))} ${p2(notch)} Z`
+  );
+};
+/** 小さな片喰 (3枚の丸い葉) */
+const kataba = (cx: number, cy: number, r: number) =>
+  [0, 120, 240].map((a) => { const [x, y] = at(r * 0.85, a); return circle(cx + x, cy + y, r * 0.75); }).join(' ');
+/** 飛び雀 (簡略)。dir=1 で右向き */
+const sparrow = (cx: number, cy: number, dir: number) => {
+  const X = (x: number) => (cx + x * dir).toFixed(2);
+  const Y = (y: number) => (cy + y).toFixed(2);
+  return (
+    // 体と頭
+    `M${X(-2.6)} ${Y(1.4)} Q${X(-2.4)} ${Y(-0.8)} ${X(0.2)} ${Y(-1.2)} Q${X(2.2)} ${Y(-1.6)} ${X(2.4)} ${Y(-0.2)} ` +
+    `L${X(3.4)} ${Y(0.2)} L${X(2.2)} ${Y(0.8)} Q${X(1)} ${Y(2.4)} ${X(-2.6)} ${Y(1.4)} Z ` +
+    // 広げた羽
+    `M${X(-0.6)} ${Y(-0.6)} L${X(-2.2)} ${Y(-3.6)} L${X(0.8)} ${Y(-1)} Z ` +
+    // 尾
+    `M${X(-2.4)} ${Y(1)} L${X(-4)} ${Y(-0.4)} L${X(-3.6)} ${Y(1.8)} Z`
+  );
+};
+
+/**
+ * 家紋 (原点中心、半径およそ7.6)。小さく表示するので、特徴を残して簡略化している。
+ * 参考: 戦国武将の家紋 (便利帳 benricho.org/kamon/sengokubusho/)
+ */
 export const MON: Record<FamilyId, string> = {
-  oda: 'M0 -7.6 a3.6 3.6 0 1 0 0.01 0 Z M4 -3.6 a3.6 3.6 0 1 0 0.01 0 Z M0 0.4 a3.6 3.6 0 1 0 0.01 0 Z M-4 -3.6 a3.6 3.6 0 1 0 0.01 0 Z',
+  // 織田木瓜: ふつうの木瓜は4枚だが、織田家は5枚の花びら
+  // 5枚の花びらを輪に並べる (真ん中は空けて)、中心に花芯を置く
+  oda: [0, 72, 144, 216, 288].map((a) => { const [x, y] = at(4.7, a); return circle(x, y, 2.9); }).join(' ') + ' ' + circle(0, 0, 1.3),
+  // 武田菱 (四つ割菱)
   takeda:
     'M0 -7 L3.2 -3.8 L0 -0.6 L-3.2 -3.8 Z M-3.8 -3.2 L-0.6 0 L-3.8 3.2 L-7 0 Z M3.8 -3.2 L7 0 L3.8 3.2 L0.6 0 Z M0 0.6 L3.2 3.8 L0 7 L-3.2 3.8 Z',
-  uesugi: 'M0 7 C-6 2 -6 -4 -1 -8 C0 -2 1 2 0 7 Z M0 7 C6 2 6 -4 1 -8 C0 -2 -1 2 0 7 Z',
-  // 五七桐 (簡略): 3枚の葉と、上に3つの花
+  // 竹に二羽飛び雀: 竹の輪の中に、向かい合う2羽の雀
+  uesugi: `${ring(7.6, 1.3)} ${sparrow(-2.5, 0.6, 1)} ${sparrow(2.5, 0.6, -1)}`,
+  // 五七桐: 3枚の葉の上に、花のつぼみが 5・7・5 の3本
   toyotomi:
-    'M-7.5 5 Q-8 -1 -3 0 Q-3.5 4.5 -7.5 5 Z M7.5 5 Q8 -1 3 0 Q3.5 4.5 7.5 5 Z M-2.4 7 Q-3.5 -1 0 -1.5 Q3.5 -1 2.4 7 Z ' +
-    `${circle(-4.5, -4.5, 1.8)} ${circle(0, -6, 1.8)} ${circle(4.5, -4.5, 1.8)}`,
-  // 三つ葉葵 (簡略): 輪の中に3枚の葉
-  tokugawa: `${ring(7.6, 1.4)} ${circle(0, -2.8, 2.6)} ${circle(2.6, 1.8, 2.6)} ${circle(-2.6, 1.8, 2.6)}`,
+    'M0 0.8 Q-3.2 2.6 -2.1 6.3 Q-1 7.6 0 7.8 Q1 7.6 2.1 6.3 Q3.2 2.6 0 0.8 Z ' +
+    'M-1.2 1.2 Q-5.8 0 -7.6 3.6 Q-7 5.8 -4.8 6 Q-2.4 5.2 -1.2 1.2 Z M1.2 1.2 Q5.8 0 7.6 3.6 Q7 5.8 4.8 6 Q2.4 5.2 1.2 1.2 Z ' +
+    [
+      ...[0, 1, 2, 3, 4].map((i) => circle(-4.6, -0.4 - i * 1.35, 0.72)),
+      ...[0, 1, 2, 3, 4, 5, 6].map((i) => circle(0, -1 - i * 1.12, 0.66)),
+      ...[0, 1, 2, 3, 4].map((i) => circle(4.6, -0.4 - i * 1.35, 0.72)),
+    ].join(' '),
+  // 三つ葉葵: 丸の中に、中心で茎が合わさるハート形の葉が3枚
+  tokugawa: `${ring(7.6, 1.2)} ${[0, 120, 240].map((a) => heartLeaf(a, 0.6, 6.3, 50)).join(' ')}`,
   // 一文字に三つ星
   mori: `M-7 -6.5 L7 -6.5 L7 -4 L-7 -4 Z ${circle(0, 0, 2.4)} ${circle(-3.8, 4.4, 2.4)} ${circle(3.8, 4.4, 2.4)}`,
-  // 三つ鱗
-  hojo: 'M0 -7 L4 0 L-4 0 Z M-4 0.6 L0 7.4 L-8 7.4 Z M4 0.6 L8 7.4 L0 7.4 Z',
-  // 足利二つ引両
+  // 北条鱗 (三つ鱗): 天地がつぶれた、横に広い三角形
+  hojo: 'M0 -5.4 L4.2 -0.2 L-4.2 -0.2 Z M-4.2 0.4 L0 5.6 L-8.4 5.6 Z M4.2 0.4 L8.4 5.6 L0 5.6 Z',
+  // 足利二つ引両 (今川家は足利の一門。赤鳥も使った)
   imagawa: `${ring(7.6, 1.4)} M-5.6 -3 L5.6 -3 L5.6 -0.6 L-5.6 -0.6 Z M-5.6 1.2 L5.6 1.2 L5.6 3.6 L-5.6 3.6 Z`,
-  // 九曜 (伊達家の替紋)
-  date: [circle(0, 0, 2.3), ...[0, 45, 90, 135, 180, 225, 270, 315].map((a) => circle(5.2 * Math.sin(rad(a)), -5.2 * Math.cos(rad(a)), 1.7))].join(' '),
+  // 九曜 (伊達家の替紋。代表の「竹に雀」は上杉家と似るため、こちらを使う)
+  date: [circle(0, 0, 2.3), ...[0, 45, 90, 135, 180, 225, 270, 315].map((a) => { const [x, y] = at(5.2, a); return circle(x, y, 1.7); })].join(' '),
   // 丸に十字
   shimazu: `${ring(7.6, 1.4)} M-1.1 -6 L1.1 -6 L1.1 6 L-1.1 6 Z M-6 -1.1 L6 -1.1 L6 1.1 L-6 1.1 Z`,
-  // 七つ片喰 (簡略): 3枚のハート形の葉
-  chosokabe: [0, 120, 240]
-    .map((a) => `M0 0 L${pt(0, 0, 7, a - 32)} Q${pt(0, 0, 8.5, a)} ${pt(0, 0, 4.6, a)} Q${pt(0, 0, 8.5, a)} ${pt(0, 0, 7, a + 32)} Z`)
-    .join(' '),
-  // 六文銭
-  sanada: [-5, 0, 5].flatMap((x) => [circle(x, -2.6, 2.1), circle(x, 2.6, 2.1)]).join(' '),
+  // 丸に七つ片喰: 丸の中に、真ん中1つと周りに6つの片喰
+  chosokabe: `${ring(7.6, 1.1)} ${kataba(0, 0, 1.55)} ${[0, 60, 120, 180, 240, 300].map((a) => { const [x, y] = at(4.1, a); return kataba(x, y, 1.45); }).join(' ')}`,
+  // 六文銭: 四角い穴のあいた銭が 3枚ずつ2段
+  sanada: [-5, 0, 5].flatMap((x) => [circle(x, -2.6, 2.2) + ' ' + squareHole(x, -2.6, 0.6), circle(x, 2.6, 2.2) + ' ' + squareHole(x, 2.6, 0.6)]).join(' '),
 };
 
 const tr = (x: number, y: number, s: number) => `translate(${x} ${y}) scale(${s})`;
