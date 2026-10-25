@@ -1,0 +1,89 @@
+import { FAMILIES } from '../data/families';
+import type { Side } from '../engine/types';
+import type { BattleResult } from './BattleScreen';
+import { Chara } from './Chara';
+import { Scenery } from './Scenery';
+
+interface Props {
+  result: BattleResult;
+  onRematch: () => void;
+  onReselect: () => void;
+  onTitle: () => void;
+}
+
+const COLORS = ['#E2483D', '#F5C033', '#2F80ED', '#F2994A', '#7CC86E', '#23407A'];
+
+export function ResultScreen({ result, onRematch, onReselect, onTitle }: Props) {
+  const { winner, families, moveCount } = result;
+  const loser: Side | null = winner ? (winner === 'sente' ? 'gote' : 'sente') : null;
+  const winFam = winner ? FAMILIES[families[winner]] : null;
+
+  return (
+    <div className="screen screen-sky">
+      <Scenery hillTop={600} />
+      {winner &&
+        Array.from({ length: 24 }, (_, i) => (
+          <div
+            key={i}
+            aria-hidden="true"
+            className="confetti"
+            style={{
+              left: (i * 53) % 1280,
+              top: -40,
+              width: i % 2 ? 14 : 22,
+              height: i % 2 ? 22 : 12,
+              background: COLORS[i % COLORS.length],
+              animationDelay: `${(i * 0.37) % 3}s`,
+              animationDuration: `${2.6 + (i % 5) * 0.4}s`,
+            }}
+          />
+        ))}
+
+      <div
+        style={{
+          position: 'absolute', left: 240, top: 64, width: 800, height: 640, borderRadius: 36, background: '#fff',
+          border: '4px solid #2b2b2b', boxShadow: '0 10px 0 #2b2b2b', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '36px 40px 0', gap: 6,
+        }}
+      >
+        <span style={{ fontSize: 22, fontWeight: 800, letterSpacing: '0.3em', paddingLeft: '0.3em', color: '#b35a00' }}>
+          {winner ? 'しょうぶあり!' : 'しょうぶ つかず'}
+        </span>
+        <h1 className="display" style={{ margin: 0, fontSize: 84, lineHeight: 1.15 }}>
+          {winFam ? `${winFam.name}の かち!` : 'ひきわけ!'}
+        </h1>
+        <div style={{ marginTop: 4, height: 230, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 24 }}>
+          {winner ? (
+            <div className="bob">
+              <Chara kind="K" family={families[winner]} mood="happy" size={212} title={FAMILIES[families[winner]].lord} />
+            </div>
+          ) : (
+            (['sente', 'gote'] as Side[]).map((s) => <Chara key={s} kind="K" family={families[s]} size={180} title={FAMILIES[families[s]].lord} />)
+          )}
+        </div>
+        <p style={{ margin: '14px 0 0', fontSize: 22, fontWeight: 800 }}>
+          {!loser
+            ? 'おなじ局面が 3かい くりかえされたよ'
+            : result.winReason === 'try'
+              ? `${FAMILIES[families[winner as Side]].lord}が あいての本陣に のりこんだ! (トライ)`
+              : `あいての大将 ${FAMILIES[families[loser]].lord}を とったよ!`}
+        </p>
+        <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--muted)' }}>{moveCount}手で けっちゃく</p>
+        <div style={{ marginTop: 22, display: 'flex', gap: 20 }}>
+          <button className="btn btn-primary" style={{ width: 260, height: 68, borderRadius: 34, fontSize: 24 }} onClick={onRematch}>
+            もういっかい
+          </button>
+          <button
+            className="btn"
+            style={{ width: 260, height: 68, borderRadius: 34, fontSize: 20, background: '#fff', color: 'var(--blue)', border: '3px solid var(--blue)', boxShadow: '0 6px 0 var(--line)' }}
+            onClick={onReselect}
+          >
+            大名を えらびなおす
+          </button>
+        </div>
+      </div>
+      <button className="btn btn-ghost" style={{ position: 'absolute', right: 40, bottom: 24 }} onClick={onTitle}>
+        タイトルへ
+      </button>
+    </div>
+  );
+}

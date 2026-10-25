@@ -1,0 +1,113 @@
+/**
+ * 効果音。Web Audio で合成するので音声ファイルは不要。
+ * 差し替えるときは play() の中身を audio 要素の再生に変えればよい。
+ */
+export type SoundName = 'select' | 'move' | 'capture' | 'promote' | 'skill' | 'shoot' | 'danger' | 'win' | 'draw' | 'tap';
+
+let ctx: AudioContext | null = null;
+let muted = false;
+
+export const isMuted = () => muted;
+export const setMuted = (value: boolean) => {
+  muted = value;
+};
+
+function audio(): AudioContext | null {
+  if (typeof window === 'undefined') return null;
+  if (!ctx) {
+    const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctor) return null;
+    ctx = new Ctor();
+  }
+  if (ctx.state === 'suspended') void ctx.resume();
+  return ctx;
+}
+
+function tone(ac: AudioContext, freq: number, start: number, dur: number, type: OscillatorType = 'triangle', vol = 0.18) {
+  const osc = ac.createOscillator();
+  const gain = ac.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, start);
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(vol, start + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+  osc.connect(gain).connect(ac.destination);
+  osc.start(start);
+  osc.stop(start + dur + 0.02);
+}
+
+/** 太鼓・駒音のような短い打撃音 */
+function thump(ac: AudioContext, start: number, freq = 140, dur = 0.18, vol = 0.5) {
+  const osc = ac.createOscillator();
+  const gain = ac.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(freq, start);
+  osc.frequency.exponentialRampToValueAtTime(freq * 0.45, start + dur);
+  gain.gain.setValueAtTime(vol, start);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+  osc.connect(gain).connect(ac.destination);
+  osc.start(start);
+  osc.stop(start + dur + 0.02);
+}
+
+function noise(ac: AudioContext, start: number, dur: number, vol = 0.3) {
+  const len = Math.floor(ac.sampleRate * dur);
+  const buf = ac.createBuffer(1, len, ac.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+  const src = ac.createBufferSource();
+  const gain = ac.createGain();
+  src.buffer = buf;
+  gain.gain.setValueAtTime(vol, start);
+  src.connect(gain).connect(ac.destination);
+  src.start(start);
+}
+
+export function play(name: SoundName) {
+  if (muted) return;
+  const ac = audio();
+  if (!ac) return;
+  const t = ac.currentTime + 0.01;
+  switch (name) {
+    case 'tap':
+      tone(ac, 660, t, 0.08, 'sine', 0.12);
+      break;
+    case 'select':
+      tone(ac, 880, t, 0.09, 'sine', 0.14);
+      break;
+    case 'move':
+      thump(ac, t, 220, 0.12, 0.45);
+      noise(ac, t, 0.04, 0.15);
+      break;
+    case 'capture':
+      thump(ac, t, 180, 0.14, 0.5);
+      tone(ac, 523, t + 0.08, 0.12);
+      tone(ac, 784, t + 0.18, 0.2);
+      break;
+    case 'promote':
+      [523, 659, 784, 1047].forEach((f, i) => tone(ac, f, t + i * 0.07, 0.22, 'triangle', 0.16));
+      break;
+    case 'skill':
+      thump(ac, t, 110, 0.35, 0.7);
+      thump(ac, t + 0.18, 110, 0.35, 0.7);
+      [392, 494, 587].forEach((f) => tone(ac, f, t + 0.36, 0.6, 'sawtooth', 0.06));
+      break;
+    case 'shoot':
+      noise(ac, t, 0.25, 0.5);
+      thump(ac, t, 90, 0.3, 0.6);
+      break;
+    case 'danger':
+      tone(ac, 740, t, 0.12, 'square', 0.06);
+      tone(ac, 740, t + 0.18, 0.12, 'square', 0.06);
+      break;
+    case 'win':
+      [523, 659, 784].forEach((f, i) => tone(ac, f, t + i * 0.14, 0.2, 'triangle', 0.18));
+      [523, 659, 784, 1047].forEach((f) => tone(ac, f, t + 0.5, 0.9, 'triangle', 0.1));
+      thump(ac, t + 0.5, 110, 0.4, 0.6);
+      break;
+    case 'draw':
+      tone(ac, 392, t, 0.3, 'triangle', 0.15);
+      tone(ac, 330, t + 0.3, 0.5, 'triangle', 0.15);
+      break;
+  }
+}
