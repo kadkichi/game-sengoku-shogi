@@ -73,9 +73,11 @@ interface Parts {
   helmA: string; helmFill: string; band: string; flaps: string; flapL: string; flapR: string;
   frontA: string; frontAFill: string; frontB: string; frontMonT: string; hatMonT: string; brows: string;
   patch: boolean;
+  /** 前立ての文字 (直江兼続の「愛」) */
+  frontText: string;
 }
 
-export type CharaSpecial = 'yukimura';
+export type CharaSpecial = 'yukimura' | 'kanetsugu';
 
 function parts(kind: Kind, fam: FamilyId, special?: CharaSpecial): Parts {
   const C = FAMILIES[fam].colors;
@@ -86,7 +88,7 @@ function parts(kind: Kind, fam: FamilyId, special?: CharaSpecial): Parts {
     beard: '', beardFill: '#FFFFFF', stache: '', stacheFill: '#FFFFFF', stacheLine: '',
     helmA: KABUTO, helmFill: C.helm, band: BAND, flaps: FLAPS, flapL: HIDE, flapR: HIDE,
     frontA: '', frontAFill: GOLD, frontB: '', frontMonT: HIDE, hatMonT: HIDE,
-    brows: 'M96 93 L112 97 M144 93 L128 97', patch: false,
+    brows: 'M96 93 L112 97 M144 93 L128 97', patch: false, frontText: '',
   };
   const lordFront = () => {
     v.frontA = circle(120, 64, 15);
@@ -287,6 +289,18 @@ function parts(kind: Kind, fam: FamilyId, special?: CharaSpecial): Parts {
     v.plates = 'M88 160 L152 160 M86 172 L154 172 M84 200 L156 200';
     v.brows = 'M98 98 Q104 95 111 98 M142 98 Q136 95 129 98';
   }
+  if (special === 'kanetsugu' && (kind === 'G' || kind === 'S')) {
+    // 直江兼続: 黒い兜に、瑞雲 (めでたい雲) に乗った「愛」の前立て。金でも銀でも同じ見た目
+    v.horns = '';
+    v.helmFill = '#2B2B3A';
+    v.frontA = 'M90 64 Q83 56 94 52 Q96 45 106 47 Q113 41 120 46 Q127 41 134 47 Q144 45 146 52 Q157 56 150 64 Z';
+    v.frontAFill = GOLD;
+    v.frontB = '';
+    v.frontMonT = HIDE;
+    v.frontText = '愛';
+    v.beard = '';
+    v.brows = 'M97 94 Q104 91 112 94 M143 94 Q136 91 128 94';
+  }
   return v;
 }
 
@@ -297,13 +311,16 @@ export interface CharaProps {
   mood?: 'normal' | 'happy';
   size: number;
   title?: string;
-  /** 特別な見た目の武将 (真田幸村) */
+  /** 特別な見た目の武将 (真田幸村・直江兼続) */
   special?: CharaSpecial;
 }
 
 /** 武将名から特別な見た目を決める */
-export const specialOf = (name: string, originFamily: FamilyId): CharaSpecial | undefined =>
-  name === '真田幸村' && originFamily === 'sanada' ? 'yukimura' : undefined;
+export const specialOf = (name: string, originFamily: FamilyId): CharaSpecial | undefined => {
+  if (name === '真田幸村' && originFamily === 'sanada') return 'yukimura';
+  if (name === '直江兼続' && originFamily === 'uesugi') return 'kanetsugu';
+  return undefined;
+};
 
 /** デフォルメ武将キャラ。全身 (240x260) か胸から上 (160x160) */
 export const Chara = memo(function Chara({ kind, family, crop = 'full', mood = 'normal', size, title, special }: CharaProps) {
@@ -378,6 +395,22 @@ export const Chara = memo(function Chara({ kind, family, crop = 'full', mood = '
       <path d={v.frontA} fill={v.frontAFill} {...outline} />
       <path d={v.frontB} fill="#2B1A12" stroke={D} strokeWidth={1.5} />
       <path d={mon} transform={v.frontMonT} fill={GOLD} />
+      {v.frontText && (
+        <text
+          x={120}
+          y={54}
+          textAnchor="middle"
+          fontSize={54}
+          fontWeight={700}
+          fill={GOLD}
+          stroke={D}
+          strokeWidth={3.2}
+          paintOrder="stroke"
+          fontFamily="'Hiragino Mincho ProN','Yu Mincho','Noto Serif JP',serif"
+        >
+          {v.frontText}
+        </text>
+      )}
       <path d={mon} transform={v.hatMonT} fill={C.monFill} />
       {happy ? (
         <path d={v.patch ? 'M128 105 Q134 97 140 105' : 'M100 105 Q106 97 112 105 M128 105 Q134 97 140 105'} fill="none" stroke={D} strokeWidth={3.5} strokeLinecap="round" />

@@ -1,14 +1,15 @@
-import { FAMILIES } from '../data/families';
+import { useCallback, useState } from 'react';
+import type { FamilyId } from '../data/families';
 import { play } from '../audio/sound';
-import { Chara } from './Chara';
+import { FamilyInfo } from './FamilyInfo';
+import { LordCarousel } from './LordCarousel';
 import { Scenery } from './Scenery';
 import { useStage } from './Stage';
 
-/** タイトルに並べる大名 */
-const LORDS = ['oda', 'takeda', 'uesugi'] as const;
-
 export function TitleScreen({ onStart }: { onStart: () => void }) {
   const { compact } = useStage();
+  const [info, setInfo] = useState<FamilyId | null>(null);
+  const closeInfo = useCallback(() => setInfo(null), []);
   return (
     <div className="screen screen-sky">
       <Scenery />
@@ -20,17 +21,8 @@ export function TitleScreen({ onStart }: { onStart: () => void }) {
           </h1>
           <p style={{ margin: '4px 0 0', fontSize: compact ? 20 : 22, fontWeight: 700, color: 'var(--blue)' }}>すきな大名をえらんで、あいての大将をとろう!</p>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: compact ? 48 : 72, marginTop: compact ? 4 : 24 }}>
-          {LORDS.map((id, i) => (
-            <div key={id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-              <div className="bob" style={{ animationDelay: `${i * 0.3}s` }}>
-                <Chara kind="K" family={id} size={compact ? 120 : 180} title={FAMILIES[id].lord} />
-              </div>
-              <div style={{ padding: '6px 20px', borderRadius: 20, fontSize: 20, fontWeight: 800, color: '#fff', background: FAMILIES[id].colors.border }}>
-                {FAMILIES[id].lord}
-              </div>
-            </div>
-          ))}
+        <div style={{ marginTop: compact ? 0 : 16 }}>
+          <LordCarousel onSelect={setInfo} stopped={info !== null} />
         </div>
         <button
           className="btn btn-primary"
@@ -43,7 +35,8 @@ export function TitleScreen({ onStart }: { onStart: () => void }) {
           あそぶ!
         </button>
       </div>
-      <div style={{ position: 'absolute', right: 40, bottom: compact ? 12 : 20, fontSize: 15, fontWeight: 700, color: '#1f3d1a' }}>おなじ たんまつで 2人で あそぶよ</div>
+      <div style={{ position: 'absolute', right: 40, bottom: compact ? 12 : 20, fontSize: 15, fontWeight: 700, color: '#1f3d1a' }}>大将を おすと 家紋と 武将が みられるよ</div>
+      {info && <FamilyInfo family={info} onClose={closeInfo} />}
     </div>
   );
 }

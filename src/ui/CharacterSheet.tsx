@@ -12,13 +12,22 @@ export function CharacterSheet() {
       <div style={{ display: 'grid', gridTemplateColumns: '120px repeat(5, 1fr)', gap: 6, alignItems: 'center' }}>
         {ids.map((id) => {
           const f = FAMILIES[id];
-          const cells: { kind: Kind; name: string; mood?: 'happy' }[] = [
-            { kind: 'K', name: f.lord },
-            { kind: 'K', name: f.lord, mood: 'happy' },
-            { kind: 'G', name: f.gold[0] },
-            { kind: 'S', name: f.silver[0] },
-            { kind: 'P', name: '足軽' },
-          ];
+          const cells: { kind: Kind; name: string; mood?: 'happy'; note?: string }[] =
+            ids.length === 1
+              ? [
+                  { kind: 'K', name: f.lord },
+                  { kind: 'K', name: f.lord, mood: 'happy' },
+                  { kind: 'G', name: f.gold[0] },
+                  { kind: 'G', name: f.gold[1] },
+                  { kind: 'S', name: f.gold[1], note: 'かんたんの銀' },
+                ]
+              : [
+                  { kind: 'K', name: f.lord },
+                  { kind: 'K', name: f.lord, mood: 'happy' },
+                  { kind: 'G', name: f.gold[0] },
+                  { kind: 'S', name: f.silver[0] },
+                  { kind: 'P', name: '足軽' },
+                ];
           return [
             <div key={`${id}-name`} style={{ fontWeight: 800, fontSize: 18 }}>
               {f.name}
@@ -26,7 +35,10 @@ export function CharacterSheet() {
             ...cells.map((c, i) => (
               <div key={`${id}-${i}`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: f.colors.tile, borderRadius: 12 }}>
                 <Chara kind={c.kind} family={id} size={size} mood={c.mood} special={specialOf(c.name, id)} />
-                <span style={{ fontSize: 12, fontWeight: 700 }}>{c.name}</span>
+                <span style={{ fontSize: 12, fontWeight: 700 }}>
+                  {c.name}
+                  {c.note ? ` (${c.note})` : ''}
+                </span>
               </div>
             )),
           ];
