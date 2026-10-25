@@ -8,14 +8,14 @@ export const SIZES: Record<Variant, { cols: number; rows: number }> = {
 
 /** 先手から見た動き (dy=-1 が前) */
 const VECTORS: Record<Variant, Record<Kind, [number, number][]>> = {
-  // ごろごろどうぶつしょうぎ: 金=いぬ、銀=ねこ
+  // 5×6: 金・銀は本将棋の金将・銀将と同じ動き
   large: {
     K: [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]],
     G: [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [0, 1]],
     S: [[-1, -1], [0, -1], [1, -1], [-1, 1], [1, 1]],
     P: [[0, -1]],
   },
-  // どうぶつしょうぎ: 金=キリン (たて・よこ)、銀=ゾウ (ななめ)
+  // 3×4: 金=たて・よこ、銀=ななめ
   small: {
     K: [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]],
     G: [[0, -1], [-1, 0], [1, 0], [0, 1]],
@@ -23,7 +23,7 @@ const VECTORS: Record<Variant, Record<Kind, [number, number][]>> = {
     P: [[0, -1]],
   },
 };
-/** 成った駒 (どちらのモードも金の動き。3×4ではニワトリと同じ) */
+/** 成った駒 (どちらのモードも 5×6 の金の動き) */
 const PROMOTED: [number, number][] = VECTORS.large.G;
 const DIAGONALS: [number, number][] = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
 
@@ -44,7 +44,7 @@ export const inEnemyZone = (state: Pick<GameState, 'rows' | 'variant'>, side: Si
   return side === 'sente' ? p.y < depth : p.y >= state.rows - depth;
 };
 
-/** 成れる駒。3×4 は足軽だけ (どうぶつしょうぎのヒヨコ) */
+/** 成れる駒。3×4 は足軽だけ */
 const canPromote = (variant: Variant, kind: Kind) => kind === 'P' || (variant === 'large' && kind === 'S');
 
 /** 動ける方向 (盤上の向き。先手は上が前) */
@@ -95,7 +95,7 @@ export function createGame(families: Record<Side, FamilyId>, variant: Variant = 
       pawns = [1, 2, 3];
       pawnRow = side === 'sente' ? 3 : 2;
     } else {
-      // どうぶつしょうぎ: 手前の段は 左から ゾウ・ライオン・キリン。武将は 5×6 の金の武将2人を使う
+      // 3×4: 手前の段は 左から 銀・大将・金。武将は 5×6 の金の武将2人を使う
       row = [['S', fam.gold[1]], ['K', fam.lord], ['G', fam.gold[0]]];
       pawns = [1];
       pawnRow = side === 'sente' ? 2 : 1;

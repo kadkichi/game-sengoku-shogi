@@ -19,7 +19,7 @@ function custom(placements: [Pos, Piece][], opts: { turn?: Side; families?: Reco
 }
 
 describe('3×4 (かんたん) 初期配置', () => {
-  it('どうぶつしょうぎと同じ並び', () => {
+  it('手前に 銀・大将・金、その前に足軽', () => {
     const s = createGame({ sente: 'oda', gote: 'uesugi' }, 'small');
     const row = (y: number) => s.board[y].map((c) => (c ? `${c.owner[0]}${c.kind}` : '.')).join(' ');
     expect([s.cols, s.rows]).toEqual([3, 4]);
@@ -36,12 +36,12 @@ describe('3×4 (かんたん) 初期配置', () => {
 });
 
 describe('3×4 駒の動き', () => {
-  it('金の武将はたて・よこ1マス (キリン)', () => {
+  it('金の武将はたて・よこ1マス', () => {
     const s = custom([[P(1, 2), piece('sente', 'G')]]);
     expect(sortPos(legalMoves(s, P(1, 2)))).toEqual(sortPos([P(1, 1), P(0, 2), P(2, 2), P(1, 3)]));
   });
 
-  it('銀の武将はななめ1マス (ゾウ)', () => {
+  it('銀の武将はななめ1マス', () => {
     const s = custom([[P(1, 2), piece('sente', 'S')]]);
     expect(sortPos(legalMoves(s, P(1, 2)))).toEqual(sortPos([P(0, 1), P(2, 1), P(0, 3), P(2, 3)]));
   });

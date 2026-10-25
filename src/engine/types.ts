@@ -4,7 +4,7 @@ export type Side = 'sente' | 'gote';
 /** K=大将 G=金の武将 S=銀の武将 P=足軽 */
 export type Kind = 'K' | 'G' | 'S' | 'P';
 
-/** small = 3×4 (どうぶつしょうぎ準拠)、large = 5×6 (ごろごろ準拠) */
+/** small = 3×4 (かんたん)、large = 5×6 (じっくり) */
 export type Variant = 'small' | 'large';
 
 export interface Pos {

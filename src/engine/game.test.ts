@@ -35,7 +35,7 @@ function custom(
 }
 
 describe('初期配置', () => {
-  it('ごろごろと同じ並び (足軽は3段目と4段目で向かい合う)', () => {
+  it('5×6 の並び (足軽は3段目と4段目で向かい合う)', () => {
     const s = createGame({ sente: 'oda', gote: 'uesugi' });
     const row = (y: number) => s.board[y].map((c) => (c ? `${c.owner[0]}${c.kind}` : '.')).join(' ');
     expect(row(0)).toBe('gS gG gK gG gS');
