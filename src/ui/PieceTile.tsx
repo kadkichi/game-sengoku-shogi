@@ -4,6 +4,7 @@ import { directions } from '../engine/game';
 import type { Piece, Variant } from '../engine/types';
 import { Chara, specialOf } from './Chara';
 import { Crest } from './FamilyInfo';
+import { tileColors } from './sideColors';
 
 interface Props {
   piece: Piece;
@@ -60,8 +61,7 @@ export function PieceTile({ piece, family, variant, cell, selected, target, shoo
       <div
         className={`${cls}${isLord ? ' lord' : ''}`}
         style={{
-          background: isLord ? '#FFE38A' : c.tile,
-          borderColor: isLord ? '#B8860B' : c.border,
+          ...tileColors(family, piece.owner, isLord),
           borderWidth: isLord ? 4 : undefined,
           width: cell - 12,
           height: cell - 12,

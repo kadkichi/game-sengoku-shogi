@@ -24,6 +24,7 @@ import { isMuted, play, setMuted, type SoundName } from '../audio/sound';
 import { Chara, specialOf } from './Chara';
 import { DirDots, PieceTile, type Motion } from './PieceTile';
 import { Clash } from './Clash';
+import { tileColors } from './sideColors';
 import { useStage } from './Stage';
 import { think } from '../ai/think';
 import { LEVEL_LABEL, type CpuSetting } from '../ai/cpu';
@@ -671,10 +672,9 @@ function FlyingPiece({ ghost, onDone }: { ghost: Ghost; onDone: () => void }) {
     anim.onfinish = onDone;
     return () => anim.cancel();
   }, [ghost, onDone]);
-  const c = FAMILIES[ghost.family].colors;
   return (
     <div ref={ref} className="ghost" style={{ left: 0, top: 0 }}>
-      <div className="tile" style={{ position: 'relative', left: 0, top: 0, background: c.tile, borderColor: c.border }}>
+      <div className="tile" style={{ position: 'relative', left: 0, top: 0, ...tileColors(ghost.family, ghost.piece.owner) }}>
         <Chara kind={ghost.piece.kind} family={ghost.family} crop="bust" size={60} special={specialOf(ghost.piece.name, ghost.piece.originFamily)} />
         <span className="tile-name">{ghost.piece.name}</span>
       </div>
@@ -785,7 +785,7 @@ function SidePanel({ side, compact, cpuLabel, thinking, game, selectedHandId, ha
             <div key={p.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
               <button
                 className={`hand-tile${selected ? ' selected' : ''}`}
-                style={{ background: fam.colors.tile, borderColor: fam.colors.border, width: hs, height: hs }}
+                style={{ ...tileColors(famId, side), width: hs, height: hs }}
                 disabled={!handEnabled}
                 aria-label={`もちごま ${p.name} ${ps.length}まい`}
                 onClick={() => onHand(side, p.id)}
