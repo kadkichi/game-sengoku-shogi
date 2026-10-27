@@ -4,6 +4,7 @@ import type { Side, Variant } from './engine/types';
 import type { CpuSetting } from './ai/cpu';
 import { BattleScreen, type BattleResult } from './ui/BattleScreen';
 import { CharacterSheet } from './ui/CharacterSheet';
+import { PrintSheets } from './ui/PrintSheets';
 import { ResultScreen } from './ui/ResultScreen';
 import { SelectScreen } from './ui/SelectScreen';
 import { Stage } from './ui/Stage';
@@ -29,6 +30,7 @@ export default function App() {
     setScreen({ name: 'battle', round: round + 1 });
   };
 
+  if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('print')) return <PrintSheets />;
   if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('chars')) {
     return (
       <Stage>
