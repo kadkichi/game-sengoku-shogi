@@ -2,10 +2,21 @@ import { FAMILIES, FAMILY_IDS, type FamilyId } from '../data/families';
 import type { Kind } from '../engine/types';
 import { Chara, specialOf } from './Chara';
 import { Crest } from './FamilyInfo';
+import { OsakaCastle } from './OsakaCastle';
 
 /** 開発用: 全キャラの一覧。URL に ?chars をつけると表示する。?chars=sanada のように家を指定すると大きく表示する */
 export function CharacterSheet() {
   const only = new URLSearchParams(window.location.search).get('chars') as FamilyId | 'mon' | null;
+  if ((only as string) === 'castle') {
+    // ?chars=castle: 大坂の陣の盤に置く大坂城 (冬・夏、上下)
+    return (
+      <div style={{ position: 'absolute', inset: 0, background: '#fff', padding: 24, display: 'flex', flexDirection: 'column', gap: 16, overflow: 'auto' }}>
+        {(['winter', 'summer'] as const).flatMap((t) =>
+          (['bottom', 'top'] as const).map((m) => <OsakaCastle key={t + m} width={1200} height={480} theme={t} frontSide={m} />),
+        )}
+      </div>
+    );
+  }
   if (only === 'mon') {
     // ?chars=mon: 12家の家紋の一覧
     return (

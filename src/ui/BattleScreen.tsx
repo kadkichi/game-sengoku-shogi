@@ -30,6 +30,7 @@ import { Chara, specialOf } from './Chara';
 import { DirDots, PieceTile, type Motion } from './PieceTile';
 import { Clash } from './Clash';
 import { RulesDialog } from './RulesDialog';
+import { OsakaCastle } from './OsakaCastle';
 import { tileColors } from './sideColors';
 import { useStage } from './Stage';
 import { think } from '../ai/think';
@@ -553,7 +554,7 @@ export function BattleScreen({ families, variant, cpu, battle, onFinish, onQuit 
   // ---- 描画 ----
   /** 大将が入っていて、トライまであと少しの段 (黄色く光らせる) */
   const tryRows = (['sente', 'gote'] as Side[]).filter((s) => isTrying(game, s)).map((s) => (s === 'sente' ? 0 : rows - 1));
-  /** 大坂の陣の盤の柄: 城の軍の陣 (奥2段) は石垣、相手の陣は陣地、あいだは野原。城の前に堀 */
+  /** 大坂の陣の盤の柄: 城の軍の陣 (奥2段) に大坂城の絵、相手の陣は陣地、あいだは野原 */
   const theme = battle?.board ?? null;
   const castleSide: Side | null = theme ? (families.sente === theme.castle ? 'sente' : 'gote') : null;
   const zoneOf = (y: number): Side | null => (y < 2 ? 'gote' : y >= rows - 2 ? 'sente' : null);
@@ -695,8 +696,13 @@ export function BattleScreen({ families, variant, cpu, battle, onFinish, onQuit 
           </div>
           <div className={`board-frame${theme ? ` theme-${theme.theme}` : ''}`}>
             <div className="board" style={{ gridTemplateColumns: `repeat(${cols}, ${cell}px)`, gridTemplateRows: `repeat(${rows}, ${cell}px)` }}>
+              {/* 大坂城のイラストは、豊臣方の陣の2段の 駒の うしろに 置く */}
+              {theme && castleSide && (
+                <div className="castle-art" style={{ top: castleSide === 'gote' ? 0 : (rows - 2) * cell }}>
+                  <OsakaCastle width={cols * cell} height={2 * cell} theme={theme.theme} frontSide={castleSide === 'gote' ? 'bottom' : 'top'} />
+                </div>
+              )}
               {cells}
-              {theme && castleSide && <div className="moat" aria-hidden="true" style={{ top: (castleSide === 'gote' ? 2 : rows - 2) * cell - 4 }} />}
               {defenders.map((d) => (
                 <div key={d.key} className="defender" style={{ left: d.at.x * cell, top: d.at.y * cell, width: cell, height: cell }}>
                   <PieceTile piece={d.piece} family={d.family} variant={variant} cell={cell} />
