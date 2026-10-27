@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { FAMILIES, type FamilyId } from '../data/families';
+import { FAMILIES, type ClanId, type FamilyId } from '../data/families';
 import type { Kind } from '../engine/types';
 
 const D = '#3A1F14';
@@ -54,7 +54,7 @@ const sparrow = (cx: number, cy: number, dir: number) => {
  * 家紋 (原点中心、半径およそ7.6)。小さく表示するので、特徴を残して簡略化している。
  * 参考: 戦国武将の家紋 (便利帳 benricho.org/kamon/sengokubusho/)
  */
-export const MON: Record<FamilyId, string> = {
+const MON_PATHS: Record<ClanId | 'east' | 'west', string> = {
   // 織田木瓜: ふつうの木瓜は4枚だが、織田家は5枚の花びら
   // 5枚の花びらを輪に並べる (真ん中は空けて)、中心に花芯を置く
   oda: [0, 72, 144, 216, 288].map((a) => { const [x, y] = at(4.7, a); return circle(x, y, 2.9); }).join(' ') + ' ' + circle(0, 0, 1.3),
@@ -93,6 +93,10 @@ export const MON: Record<FamilyId, string> = {
   // 西軍: 石田三成の 九曜
   west: [circle(0, 0, 2.3), ...[0, 45, 90, 135, 180, 225, 270, 315].map((a) => { const [x, y] = at(5.2, a); return circle(x, y, 1.7); })].join(' '),
 };
+
+/** 家紋。大坂の陣の軍などは、見た目のもとの家 (look) の家紋を使う */
+export const monOf = (family: FamilyId): string =>
+  (MON_PATHS as Partial<Record<FamilyId, string>>)[family] ?? MON_PATHS[FAMILIES[family].look ?? 'tokugawa'];
 
 const tr = (x: number, y: number, s: number) => `translate(${x} ${y}) scale(${s})`;
 const HIDE = 'scale(0)';
@@ -367,7 +371,8 @@ export interface CharaProps {
 
 /** 武将名から特別な見た目を決める */
 export const specialOf = (name: string, originFamily: FamilyId): CharaSpecial | undefined => {
-  if (name === '真田幸村' && originFamily === 'sanada') return 'yukimura';
+  // 真田幸村は、真田家でも 大坂の陣の豊臣方でも 同じ見た目
+  if (name === '真田幸村' && (originFamily === 'sanada' || originFamily.endsWith('Toyotomi'))) return 'yukimura';
   if (name === '直江兼続' && originFamily === 'uesugi') return 'kanetsugu';
   return undefined;
 };
@@ -377,7 +382,7 @@ export const Chara = memo(function Chara({ kind, family, crop = 'full', mood = '
   // 先鋒は 銀の武将の絵を使う。合戦モードの軍は、look の家の大将の見た目にする (色は その軍の色)
   const v = parts(kind === 'V' ? 'S' : kind, family, special, FAMILIES[family].look);
   const C = FAMILIES[family].colors;
-  const mon = MON[family];
+  const mon = monOf(family);
   const bigStache = v.stache !== '';
   const happy = mood === 'happy';
   const full = crop === 'full';

@@ -91,6 +91,7 @@ export default function App() {
           key={screen.round}
           families={battleDef ? armies : families}
           variant={battleDef ? battleDef.variant : variant}
+          battle={battleDef}
           cpu={cpu}
           onFinish={(result) => setScreen({ name: 'result', result })}
           onQuit={() => setScreen({ name: 'title' })}

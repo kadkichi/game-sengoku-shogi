@@ -1,5 +1,12 @@
 import { useState } from 'react';
-import { ARMY_IDS, FAMILIES, FAMILY_IDS } from '../data/families';
+import { ARMY_IDS, FAMILIES, FAMILY_IDS, type FamilyId } from '../data/families';
+import { BATTLE_IDS, BATTLES } from '../data/battles';
+
+/** 一覧に出す名前。合戦モードの軍は「関ヶ原 東軍」のように合戦の名前をつける */
+const labelOf = (id: FamilyId) => {
+  const b = BATTLE_IDS.find((bid) => (BATTLES[bid].armies as FamilyId[]).includes(id));
+  return b ? `${BATTLES[b].short} ${FAMILIES[id].name}` : FAMILIES[id].name.replace(/家$/, '');
+};
 import type { Kind, Piece, Variant } from '../engine/types';
 import { play } from '../audio/sound';
 import { PieceTile } from './PieceTile';
@@ -53,7 +60,7 @@ export function RulesDialog({ variant, onClose }: { variant?: Variant; onClose: 
         <li>あいての駒が いる マスに うごくと、その駒を とれる</li>
         <li>自分の駒が いる マスには うごけない</li>
         {!variant && <li>じっくり (5×6) では 金と銀の うごきが すこし ちがう。盤の 駒の 点を 見てね</li>}
-        {variant !== 'small' && <li>関ヶ原の 合戦の「先鋒」(赤い「先」の しるし) は、前・左・右に 1マス。あいての陣で 出世する</li>}
+        {variant !== 'small' && <li>関ヶ原・大坂の陣の「先鋒」(赤い「先」の しるし) は、前・左・右に 1マス。あいての陣で 出世する</li>}
       </ul>
     </div>,
 
@@ -125,7 +132,7 @@ export function RulesDialog({ variant, onClose }: { variant?: Variant; onClose: 
           return (
             <div key={id} className="rules-skill">
               <span className="rules-skill-name" style={{ background: f.colors.border }}>
-                {f.name.replace(/家$/, '')}
+                {labelOf(id)}
               </span>
               <span>
                 <b>{f.skill.name}</b> {f.skill.desc}

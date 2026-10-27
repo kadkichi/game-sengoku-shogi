@@ -2,6 +2,8 @@ import { FAMILIES } from '../data/families';
 import {
   applyAction,
   canActivateSkill,
+  cannonTargets,
+  turncoatTargets,
   legalDrops,
   legalMoves,
   pullSources,
@@ -72,6 +74,12 @@ function expand(state: GameState, start: GameState, prefix: Action[], out: Turn[
     case 'spawn':
       for (const to of spawnTargets(state)) next({ type: 'spawn', to });
       break;
+    case 'naiou':
+      for (const at of turncoatTargets(state)) next({ type: 'turncoat', at });
+      break;
+    case 'cannon':
+      for (const to of cannonTargets(state)) next({ type: 'bombard', to });
+      break;
     case 'drop2':
       for (const p of distinctHand(state)) for (const to of nearEnemy(state, legalDrops(state, p.id))) next({ type: 'drop', pieceId: p.id, to });
       break;
@@ -108,7 +116,7 @@ export function listTurns(state: GameState, skills = true): Turn[] {
   const activate: Action = { type: 'activateSkill' };
   const after = applyAction(state, activate);
   const type = FAMILIES[state.families[state.turn]].skill.type;
-  if (type === 'shield') {
+  if (type === 'shield' || type === 'fort') {
     // 小田原城は手番を使わないので、そのあと普通の手を指す
     normalTurns(after, [activate], out);
   } else if (type === 'undo') {

@@ -68,15 +68,38 @@ export const isChargeUnit = (state: GameState, piece: Piece | null, side: Side):
   );
 };
 
-/** 内応の密書: 寝返らせられる相手の駒の位置 (持ち駒に寝返り候補がいて、盤上にもう1人がいるとき) */
+/** 内応の密書: 寝返らせられる相手の駒の位置 (盤上の相手側にいる 寝返り候補) */
 export function turncoatTargets(state: GameState): Pos[] {
   const side = state.turn;
   const names = FAMILIES[state.families[side]].skill.turncoats ?? [];
-  const inHand = state.hands[side].filter((p) => names.includes(p.name)).map((p) => p.name);
-  if (inHand.length === 0) return [];
   const out: Pos[] = [];
   forEachPiece(state, (piece, at) => {
-    if (piece.owner !== side && names.includes(piece.name) && !inHand.includes(piece.name)) out.push(at);
+    if (piece.owner !== side && names.includes(piece.name) && !isForbidden(state, { type: 'turncoat', at })) out.push(at);
+  });
+  return out;
+}
+
+/** 決まった1人 (skill.unit) の位置。自分の家の その武将だけ */
+function findUnit(state: GameState, side: Side): Pos | null {
+  let found: Pos | null = null;
+  forEachPiece(state, (piece, at) => {
+    if (isChargeUnit(state, piece, side) || isFortUnit(state, piece, side)) found = at;
+  });
+  return found;
+}
+
+const isFortUnit = (state: GameState, piece: Piece, side: Side): boolean => {
+  const skill = FAMILIES[state.families[side]].skill;
+  return skill.type === 'fort' && piece.owner === side && piece.name === skill.unit && piece.originFamily === state.families[side];
+};
+
+/** 大筒の砲撃: 撃てる相手の駒 (相手の陣 = こちらから見た敵陣にいる、大将以外) */
+export function cannonTargets(state: GameState): Pos[] {
+  const side = state.turn;
+  const out: Pos[] = [];
+  forEachPiece(state, (piece, at) => {
+    if (piece.owner !== side && piece.kind !== 'K' && inEnemyZone(state, side, at) && !isShielded(state, at) && !isForbidden(state, { type: 'bombard', to: at }))
+      out.push(at);
   });
   return out;
 }
@@ -215,16 +238,25 @@ function slide(state: GameState, from: Pos, dirs: [number, number][]): Pos[] {
 const gameOver = (state: GameState) => state.winner !== null || state.draw;
 
 /** 小田原城で守られている駒は取れない */
-const isShielded = (state: GameState, p: Pos) => {
+/** 守りの技で守られている駒か (小田原城総構え=全部の駒、真田丸=決まった1人と まわり8マス) */
+export function isProtected(state: GameState, p: Pos): boolean {
   const target = pieceAt(state, p);
-  return !!target && state.shield !== null && target.owner === state.shield && state.shield !== state.turn;
-};
+  if (!target || state.shield === null || target.owner !== state.shield) return false;
+  if (FAMILIES[state.families[state.shield]].skill.type !== 'fort') return true;
+  const unit = findUnit(state, state.shield);
+  return !!unit && Math.abs(unit.x - p.x) <= 1 && Math.abs(unit.y - p.y) <= 1;
+}
+
+/** 小田原城総構え・真田丸で守られていて、いま取れない駒 */
+const isShielded = (state: GameState, p: Pos) => state.shield !== state.turn && isProtected(state, p);
 
 const isForbidden = (state: GameState, action: Action) => {
   const f = state.forbidden;
   if (!f || f.type !== action.type) return false;
   if ((f.type === 'move' || f.type === 'shoot' || f.type === 'pull') && 'from' in action && 'to' in action)
     return samePos(f.from, action.from) && samePos(f.to, action.to);
+  if (f.type === 'turncoat' && action.type === 'turncoat') return samePos(f.at, action.at);
+  if (f.type === 'bombard' && action.type === 'bombard') return samePos(f.to, action.to);
   if (f.type === 'drop' && action.type === 'drop') return f.pieceId === action.pieceId && samePos(f.to, action.to);
   if (f.type === 'spawn' && action.type === 'spawn') return samePos(f.to, action.to);
   return false;
@@ -268,10 +300,13 @@ export function legalMoves(state: GameState, from: Pos): Pos[] {
         if (piece.kind === 'K') return [];
         moves = slide(state, from, DIAGONALS);
         break;
-      case 'charge':
+      case 'charge': {
         if (!isChargeUnit(state, piece, state.turn)) return [];
-        moves = slide(state, from, [[0, forward(piece.owner)]]);
+        const f = forward(piece.owner);
+        const fan = FAMILIES[state.families[state.turn]].skill.chargeDirs === 'fan';
+        moves = slide(state, from, fan ? [[-1, f], [0, f], [1, f]] : [[0, f]]);
         break;
+      }
       default:
         return [];
     }
@@ -370,6 +405,10 @@ export function canActivateSkill(state: GameState): boolean {
       return hasAnySkillMove(trial);
     case 'naiou':
       return turncoatTargets(state).length > 0;
+    case 'cannon':
+      return cannonTargets(state).length > 0;
+    case 'fort':
+      return findUnit(state, state.turn) !== null;
     case 'drop2':
       return state.hands[state.turn].length >= 2 && legalDrops(trial, state.hands[state.turn][0].id).length > 0;
     case 'pull':
@@ -393,9 +432,9 @@ export function findKing(state: GameState, side: Side): Pos | null {
 
 /** その側の大将が、相手の駒に取られる位置にいるか */
 export function isKingInDanger(state: GameState, side: Side): boolean {
-  if (state.shield === side) return false;
   const king = findKing(state, side);
   if (!king) return false;
+  if (state.shield === side && isProtected(state, king)) return false;
   let danger = false;
   forEachPiece(state, (piece, at) => {
     if (danger || piece.owner === side) return;
@@ -445,26 +484,13 @@ export function applyAction(prev: GameState, action: Action): GameState {
     case 'activateSkill': {
       if (!canActivateSkill(state)) fail('cannot activate skill');
       const type = skillTypeOf(state, side);
-      if (type === 'shield') {
+      if (type === 'shield' || type === 'fort') {
         state.skillUsed[side] = true;
         state.shield = side;
         state.events.push({ type: 'skill', side, family: fam }, { type: 'shield', side });
         return state;
       }
       if (type === 'undo') return undoLastTurn(state);
-      if (type === 'naiou') {
-        // 内応の密書: 盤上のもう1人が、その場で寝返る (出世はそのまま)。これで手番は終わり
-        state.skillUsed[side] = true;
-        state.turnFirst ??= action;
-        state.events.push({ type: 'skill', side, family: fam });
-        for (const at of turncoatTargets(state)) {
-          const piece = state.board[at.y][at.x] as Piece;
-          piece.owner = side;
-          state.events.push({ type: 'turncoat', side, piece: { ...piece }, at });
-        }
-        endTurn(state);
-        return state;
-      }
       state.skillPhase = { type, step: 1, moved: [] };
       return state;
     }
@@ -489,6 +515,26 @@ export function applyAction(prev: GameState, action: Action): GameState {
         state.moveCount++;
         return state;
       }
+      endTurn(state);
+      return state;
+    }
+    case 'turncoat': {
+      // 内応の密書: 選んだ駒が、その場で寝返る (出世はそのまま)。これで手番は終わり
+      if (phase?.type !== 'naiou') fail('not naiou');
+      if (!turncoatTargets(state).some((p) => samePos(p, action.at))) fail('illegal turncoat');
+      commit();
+      const piece = state.board[action.at.y][action.at.x] as Piece;
+      piece.owner = side;
+      state.events.push({ type: 'turncoat', side, piece: { ...piece }, at: action.at });
+      endTurn(state);
+      return state;
+    }
+    case 'bombard': {
+      // 大筒の砲撃: 相手の陣の駒を1枚取る
+      if (phase?.type !== 'cannon') fail('not cannon');
+      if (!cannonTargets(state).some((p) => samePos(p, action.to))) fail('illegal bombard');
+      commit();
+      capture(state, action.to, 'shoot');
       endTurn(state);
       return state;
     }

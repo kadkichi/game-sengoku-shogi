@@ -4,6 +4,9 @@ import { FAMILIES, type FamilyId } from '../data/families';
 import {
   applyAction,
   canActivateSkill,
+  cannonTargets,
+  isProtected,
+  turncoatTargets,
   createGame,
   directions,
   findKing,
@@ -31,6 +34,7 @@ import { tileColors } from './sideColors';
 import { useStage } from './Stage';
 import { think } from '../ai/think';
 import { LEVEL_LABEL, type CpuSetting } from '../ai/cpu';
+import type { BattleDef } from '../data/battles';
 
 export interface BattleResult {
   winner: Side | null;
@@ -51,6 +55,8 @@ interface Props {
   variant: Variant;
   /** CPU と対戦するときの設定。null なら2人で遊ぶ */
   cpu: CpuSetting | null;
+  /** 合戦モードなら、その合戦 (盤の柄が変わる) */
+  battle?: BattleDef | null;
   onFinish: (result: BattleResult) => void;
   onQuit: () => void;
 }
@@ -81,7 +87,7 @@ const CPU_STEP = 650;
 const CPU_AFTER_SKILL = 1500;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export function BattleScreen({ families, variant, cpu, onFinish, onQuit }: Props) {
+export function BattleScreen({ families, variant, cpu, battle, onFinish, onQuit }: Props) {
   const [game, setGame] = useState<GameState>(() => createGame(families, variant));
   /** CPU が続けて操作するとき、最新の局面を読むために使う */
   const gameRef = useRef(game);
@@ -136,6 +142,8 @@ export function BattleScreen({ families, variant, cpu, onFinish, onQuit }: Props
 
   const targets = useMemo<Pos[]>(() => {
     if (phaseType === 'spawn') return spawnTargets(game);
+    if (phaseType === 'naiou') return turncoatTargets(game);
+    if (phaseType === 'cannon') return cannonTargets(game);
     if (!sel) return [];
     if (sel.type === 'hand') return legalDrops(game, sel.pieceId);
     if (phaseType === 'shoot') return shootTargets(game, sel.pos);
@@ -282,9 +290,14 @@ export function BattleScreen({ families, variant, cpu, onFinish, onQuit }: Props
           else say(ev.piece.kind === 'P' ? '出世!' : '武勲!', ev.piece.kind === 'P' ? '足軽が 武将なみに つよくなった' : `${ev.piece.name}が 武勲を あげた`);
           if (sound !== 'shoot') sound = 'promote';
           break;
-        case 'shield':
-          say('小田原城総構え!', `つぎの あいての番、${army}の駒は とられない`);
+        case 'shield': {
+          const skill = FAMILIES[game.families[side]].skill;
+          say(
+            `${skill.name}!`,
+            skill.type === 'fort' ? `${skill.unit}と まわりの駒は、つぎの あいての番 とられない` : `つぎの あいての番、${army}の駒は とられない`,
+          );
           break;
+        }
         case 'turncoat':
           // 内応の密書: 盤上の駒が、その場で寝返る
           setJustPromoted(ev.piece.id);
@@ -401,6 +414,10 @@ export function BattleScreen({ families, variant, cpu, onFinish, onQuit }: Props
         return piece.kind === 'K' ? '独眼竜では 大将は うごかせないよ' : `${name}は いま うごけないよ`;
       case 'charge':
         return `${turnFam.skill.name}で うごかせるのは ${turnFam.skill.unit}だけだよ`;
+      case 'naiou':
+        return '寝返らせられるのは 光っている 武将だけだよ';
+      case 'cannon':
+        return '大筒で ねらえるのは 光っている 駒だけだよ';
       default:
         return game.forbidden ? `${name}は いま うごけないよ (さっきと おなじ手は 指せない)` : `${name}は いま うごけないよ`;
     }
@@ -411,6 +428,11 @@ export function BattleScreen({ families, variant, cpu, onFinish, onQuit }: Props
     const tapped = pieceAt(game, pos);
     if (phaseType === 'spawn') {
       if (isTarget(pos)) dispatch({ type: 'spawn', to: pos });
+      return;
+    }
+    if (phaseType === 'naiou' || phaseType === 'cannon') {
+      if (isTarget(pos)) dispatch(phaseType === 'naiou' ? { type: 'turncoat', at: pos } : { type: 'bombard', to: pos });
+      else if (tapped) notice(whyCannotMove(tapped));
       return;
     }
     if (phaseType === 'shoot' || (phaseType === 'pull' && phase?.step === 1)) {
@@ -504,7 +526,13 @@ export function BattleScreen({ families, variant, cpu, onFinish, onQuit }: Props
         hint = sel ? 'ななめの 光るマスに うごかそう' : 'ななめに うごかす駒を えらんでね';
         break;
       case 'charge':
-        hint = `${turnFam.skill.unit}を まっすぐ前に すすめよう`;
+        hint = `${turnFam.skill.unit}を ${turnFam.skill.chargeDirs === 'fan' ? '前か ななめ前に' : 'まっすぐ前に'} すすめよう`;
+        break;
+      case 'naiou':
+        hint = '寝返らせる 武将を えらんでね (光っている駒)';
+        break;
+      case 'cannon':
+        hint = '大筒で ねらう 駒を えらんでね (光っている駒)';
         break;
     }
     if (step === 1) hintButtons.push(cancel);
@@ -525,6 +553,15 @@ export function BattleScreen({ families, variant, cpu, onFinish, onQuit }: Props
   // ---- 描画 ----
   /** 大将が入っていて、トライまであと少しの段 (黄色く光らせる) */
   const tryRows = (['sente', 'gote'] as Side[]).filter((s) => isTrying(game, s)).map((s) => (s === 'sente' ? 0 : rows - 1));
+  /** 大坂の陣の盤の柄: 城の軍の陣 (奥2段) は石垣、相手の陣は陣地、あいだは野原。城の前に堀 */
+  const theme = battle?.board ?? null;
+  const castleSide: Side | null = theme ? (families.sente === theme.castle ? 'sente' : 'gote') : null;
+  const zoneOf = (y: number): Side | null => (y < 2 ? 'gote' : y >= rows - 2 ? 'sente' : null);
+  const themeClass = (y: number) => {
+    if (!theme) return '';
+    const z = zoneOf(y);
+    return z === null ? ' field' : z === castleSide ? ' castle' : ' jin';
+  };
   const cells = [];
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
@@ -541,7 +578,7 @@ export function BattleScreen({ families, variant, cpu, onFinish, onQuit }: Props
           ref={(el) => {
             if (el) cellRefs.current.set(`${x},${y}`, el);
           }}
-          className={`cell${x < cols - 1 ? ' line-r' : ''}${y < rows - 1 ? ' line-b' : ''}${variant === 'small' && (y === 0 || y === rows - 1) ? ' zone' : ''}${tryRows.includes(y) ? ' try-row' : ''}`}
+          className={`cell${x < cols - 1 ? ' line-r' : ''}${y < rows - 1 ? ' line-b' : ''}${variant === 'small' && (y === 0 || y === rows - 1) ? ' zone' : ''}${tryRows.includes(y) ? ' try-row' : ''}${themeClass(y)}`}
           aria-label={label}
           onClick={() => onCell(pos)}
         >
@@ -555,12 +592,16 @@ export function BattleScreen({ families, variant, cpu, onFinish, onQuit }: Props
               selected={selected}
               target={target}
               shooter={isSource}
-              shielded={game.shield === piece.owner}
+              shielded={isProtected(game, pos)}
               motion={motions[piece.id]}
               justPromoted={justPromoted === piece.id}
             />
           )}
-          {target && piece && <span className={`tag${phaseType === 'shoot' ? ' tag-shoot' : ''}`}>{phaseType === 'shoot' ? 'うつ!' : 'とれる!'}</span>}
+          {target && piece && (
+            <span className={`tag${phaseType === 'shoot' || phaseType === 'cannon' ? ' tag-shoot' : ''}`}>
+              {phaseType === 'shoot' || phaseType === 'cannon' ? 'うつ!' : phaseType === 'naiou' ? '寝返らせる' : 'とれる!'}
+            </span>
+          )}
         </button>,
       );
     }
@@ -652,9 +693,10 @@ export function BattleScreen({ families, variant, cpu, onFinish, onQuit }: Props
               </div>
             ) : null}
           </div>
-          <div className="board-frame">
+          <div className={`board-frame${theme ? ` theme-${theme.theme}` : ''}`}>
             <div className="board" style={{ gridTemplateColumns: `repeat(${cols}, ${cell}px)`, gridTemplateRows: `repeat(${rows}, ${cell}px)` }}>
               {cells}
+              {theme && castleSide && <div className="moat" aria-hidden="true" style={{ top: (castleSide === 'gote' ? 2 : rows - 2) * cell - 4 }} />}
               {defenders.map((d) => (
                 <div key={d.key} className="defender" style={{ left: d.at.x * cell, top: d.at.y * cell, width: cell, height: cell }}>
                   <PieceTile piece={d.piece} family={d.family} variant={variant} cell={cell} />

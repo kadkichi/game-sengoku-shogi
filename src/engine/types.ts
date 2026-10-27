@@ -60,7 +60,9 @@ export type Action =
   | { type: 'endSkill' }
   | { type: 'shoot'; from: Pos; to: Pos }
   | { type: 'pull'; from: Pos; to: Pos }
-  | { type: 'spawn'; to: Pos };
+  | { type: 'spawn'; to: Pos }
+  | { type: 'turncoat'; at: Pos }
+  | { type: 'bombard'; to: Pos };
 
 /** 鳴くまで待とう で戻すための、ある手番の始まりの局面 */
 export type Snapshot = Omit<GameState, 'thisTurnStart' | 'lastTurnStart' | 'events'>;

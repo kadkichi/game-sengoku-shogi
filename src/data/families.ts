@@ -14,7 +14,7 @@ export type ClanId =
   | 'sanada';
 
 /** 合戦モードの軍 (関ヶ原の東軍・西軍など)。大名家と同じ形のデータで持つ */
-export type ArmyId = 'east' | 'west';
+export type ArmyId = 'east' | 'west' | 'winterTokugawa' | 'winterToyotomi' | 'summerTokugawa' | 'summerToyotomi';
 
 export type FamilyId = ClanId | ArmyId;
 
@@ -32,6 +32,8 @@ export type FamilyId = ClanId | ArmyId;
  * spawn      新しい足軽を1枚打つ (長宗我部)
  * charge     決まった1人 (skill.unit) がまっすぐ前に何マスでも (真田の幸村・西軍の島津義弘)
  * naiou      持ち駒にいる寝返り候補がいれば、盤上のもう1人を寝返らせる。手番は終わる (東軍)
+ * fort       決まった1人 (skill.unit) と まわり8マスの味方は、次の相手の番 取られない。手番を使わない (冬の陣の豊臣方)
+ * cannon     相手の陣 (奥2段) にいる駒を1枚、どこからでも取る。大将は取れない (冬の陣の徳川方)
  */
 export type SkillType =
   | 'shoot'
@@ -45,7 +47,9 @@ export type SkillType =
   | 'pull'
   | 'spawn'
   | 'charge'
-  | 'naiou';
+  | 'naiou'
+  | 'fort'
+  | 'cannon';
 
 export interface Family {
   id: FamilyId;
@@ -65,8 +69,10 @@ export interface Family {
     smallNote?: string;
     /** 発動したときの掛け声 */
     phrase: string;
-    /** charge: 技を使える駒の名前 */
+    /** charge・fort: 技を使える駒の名前 */
     unit?: string;
+    /** charge: 進める向き。front=まっすぐ前だけ (ふつう)、fan=まっすぐ前と ななめ前 */
+    chargeDirs?: 'front' | 'fan';
     /** naiou: 寝返らせられる武将 (1人を持ち駒にすると、盤上のもう1人を寝返らせられる) */
     turncoats?: string[];
   };
@@ -87,7 +93,7 @@ export interface Family {
 
 const GOLD = '#F5C033';
 
-export const FAMILIES: Record<FamilyId, Family> = {
+export const FAMILIES = {
   oda: {
     id: 'oda', name: '織田家', army: '織田軍', lord: '織田信長',
     gold: ['柴田勝家', '明智光秀'], silver: ['羽柴秀吉', '前田利家'],
@@ -218,8 +224,8 @@ export const FAMILIES: Record<FamilyId, Family> = {
     vanguard: ['藤堂高虎', '細川忠興', '加藤嘉明'],
     skill: {
       type: 'naiou', name: '内応の密書', phrase: '約束を 果たされよ!',
-      short: '小早川か吉川の1人を もちごまに すると、盤に のこった もう1人を 寝返らせる',
-      desc: '小早川秀秋か吉川広家の1人を とって もちごまに していると、盤の上に のこった もう1人を 東軍に 寝返らせる (出世していれば そのまま。これで 手番は おわり)',
+      short: '小早川か吉川の どちらか1人を 東軍に 寝返らせる',
+      desc: '盤の上に いる 西軍の 小早川秀秋か吉川広家を 1人えらんで、東軍に 寝返らせる (出世していれば そのまま。これで 手番は おわり)',
       turncoats: ['小早川秀秋', '吉川広家'],
     },
     colors: { main: '#2F6B3A', border: '#2F6B3A', tile: '#E6F4E4', helm: '#2F6B3A', trim: GOLD, monFill: GOLD },
@@ -236,9 +242,54 @@ export const FAMILIES: Record<FamilyId, Family> = {
     },
     colors: { main: '#6B3FA0', border: '#5B3290', tile: '#F0E8FA', helm: '#4A2A78', trim: GOLD, monFill: GOLD },
   },
-};
+} as Record<FamilyId, Family>;
 
-export const ARMY_IDS: ArmyId[] = ['east', 'west'];
+// ---- 合戦モード: 大坂冬の陣・夏の陣 (顔ぶれは同じで、必殺技だけ違う) ----
+const OSAKA_TOKUGAWA = {
+  name: '徳川方', army: '徳川方', lord: '徳川家康', look: 'tokugawa',
+  gold: ['徳川秀忠', '井伊直孝'], silver: ['前田利常', '伊達政宗'],
+  vanguard: ['藤堂高虎', '松平忠直', '上杉景勝'],
+  colors: { main: '#2F6B3A', border: '#2F6B3A', tile: '#E6F4E4', helm: '#2F6B3A', trim: GOLD, monFill: GOLD },
+} as const satisfies Partial<Family>;
+const OSAKA_TOYOTOMI = {
+  name: '豊臣方', army: '豊臣方', lord: '豊臣秀頼', look: 'toyotomi',
+  gold: ['真田幸村', '後藤又兵衛'], silver: ['木村重成', '毛利勝永'],
+  vanguard: ['長宗我部盛親', '明石全登', '大野治長'],
+  colors: { main: '#E8731E', border: '#B04E0C', tile: '#FFE8D6', helm: '#E8731E', trim: GOLD, monFill: '#FFF3C4' },
+} as const satisfies Partial<Family>;
+
+const osaka = (base: typeof OSAKA_TOKUGAWA | typeof OSAKA_TOYOTOMI, id: ArmyId, skill: Family['skill']): Family => ({
+  ...base,
+  id,
+  gold: [...base.gold],
+  silver: [...base.silver],
+  vanguard: [...base.vanguard],
+  colors: { ...base.colors },
+  skill,
+});
+
+FAMILIES.winterTokugawa = osaka(OSAKA_TOKUGAWA, 'winterTokugawa', {
+  type: 'cannon', name: '大筒の砲撃', phrase: '放てー!',
+  short: 'あいての陣に いる駒を 1まい、どこからでも とる',
+  desc: 'あいての陣 (奥2段) に いる駒を 1まい、どこからでも とる (大将は とれない)',
+});
+FAMILIES.winterToyotomi = osaka(OSAKA_TOYOTOMI, 'winterToyotomi', {
+  type: 'fort', name: '真田丸', phrase: '真田丸に 寄せつけるな!', unit: '真田幸村',
+  short: '真田幸村と まわりの 味方は、つぎの あいての番 とられない',
+  desc: '真田幸村と まわり8マスに いる 味方は、つぎの あいての番 とられない (この技では 手番を使わない。そのあと ふつうに 指す。幸村が とられたら 使えない)',
+});
+FAMILIES.summerTokugawa = osaka(OSAKA_TOKUGAWA, 'summerTokugawa', {
+  type: 'arrows', name: '大軍の進軍', phrase: '数で 押しつぶせ!',
+  short: '大将いがいの駒を 3まいまで 1マスずつ 前に すすめる',
+  desc: '大将いがいの駒を 3まいまで、1マスずつ まっすぐ前に すすめる (駒は とれない)',
+});
+FAMILIES.summerToyotomi = osaka(OSAKA_TOYOTOMI, 'summerToyotomi', {
+  type: 'charge', name: '日本一の兵', phrase: 'ねらうは 家康 ただ一人!', unit: '真田幸村', chargeDirs: 'fan',
+  short: '真田幸村が まっすぐ前か ななめ前に 何マスでも すすむ',
+  desc: '真田幸村が、まっすぐ前か ななめ前に 何マスでも すすむ (駒は とびこえない。とまった先の てきは とれる。幸村が とられたら 使えない)',
+});
+
+export const ARMY_IDS: ArmyId[] = ['east', 'west', 'winterTokugawa', 'winterToyotomi', 'summerTokugawa', 'summerToyotomi'];
 
 /** 12の大名家 (ふつうの対戦で選べる家) */
 export const FAMILY_IDS: ClanId[] = [

@@ -145,9 +145,14 @@ describe('CPU', () => {
     expect(after.hands.sente.some((p) => p.kind === 'G')).toBe(true);
   });
 
-  it('関ヶ原 (東軍 対 西軍) でも、3つの強さで 反則なく 最後まで指せる', () => {
-    for (const level of ['weak', 'normal', 'strong'] as CpuLevel[]) {
-      let s = createGame({ sente: 'east', gote: 'west' }, 'large');
+  it('合戦モード (関ヶ原・大坂冬の陣・夏の陣) でも、3つの強さで 反則なく 指せる', () => {
+    const pairs: Record<Side, FamilyId>[] = [
+      { sente: 'east', gote: 'west' },
+      { sente: 'winterToyotomi', gote: 'winterTokugawa' },
+      { sente: 'summerTokugawa', gote: 'summerToyotomi' },
+    ];
+    for (const families of pairs) for (const level of ['weak', 'normal', 'strong'] as CpuLevel[]) {
+      let s = createGame(families, 'large');
       for (let ply = 0; ply < 40 && !s.winner && !s.draw; ply++) s = play(s, level, seeded(ply + 3)).after;
       expect(s.moveCount).toBeGreaterThan(0);
     }

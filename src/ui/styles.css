@@ -250,3 +250,21 @@ button { font-family: inherit; color: inherit; }
 .play-choice { border-radius: 28px; flex-direction: column; gap: 2px; line-height: 1.15; background: #d0392e; color: #fff; box-shadow: 0 6px 0 #9e2a22; }
 .play-choice.battle { background: #3a2a1f; border: 4px solid #c9a227; box-shadow: 0 6px 0 #1f150f; }
 .play-choice:disabled { background: #e3dccf; color: #8a7a66; border: 4px dashed #c9bfae; box-shadow: none; cursor: default; }
+
+/* 大坂の陣の盤: 豊臣方の陣は大坂城の石垣、冬は水の堀と雪、夏は埋められた堀と夏草 */
+.board-frame.theme-winter { background: #3b3f47; box-shadow: 0 6px 0 #23262b; }
+.board-frame.theme-summer { background: #7a5a2e; box-shadow: 0 6px 0 #553e1f; }
+.theme-winter .cell.field { background-color: #b9d9a3; background-image: radial-gradient(circle, #fff 0 2.5px, transparent 3px), radial-gradient(circle, #fff 0 2px, transparent 2.5px); background-size: 34px 34px, 26px 26px; background-position: 4px 6px, 17px 19px; }
+.theme-summer .cell.field { background: #93c96a; }
+.cell.castle {
+  background-color: #c9c4ba;
+  background-image: linear-gradient(#a9a397 2px, transparent 2px), linear-gradient(90deg, #a9a397 2px, transparent 2px), linear-gradient(90deg, #a9a397 2px, transparent 2px);
+  background-size: 100% 20px, 32px 20px, 32px 20px;
+  background-position: 0 0, 0 0, 16px 10px;
+}
+.theme-summer .cell.castle { background-color: #cdbfa3; background-image: linear-gradient(#ab9a78 2px, transparent 2px), linear-gradient(90deg, #ab9a78 2px, transparent 2px), linear-gradient(90deg, #ab9a78 2px, transparent 2px); }
+.cell.jin { background: #e7dcc0; }
+.theme-winter .cell.line-r, .theme-winter .cell.line-b, .theme-summer .cell.line-r, .theme-summer .cell.line-b { border-color: rgba(60, 60, 50, 0.25); }
+.moat { position: absolute; left: 0; right: 0; height: 8px; border-radius: 4px; pointer-events: none; z-index: 1; }
+.theme-winter .moat { background: #4a90c8; box-shadow: 0 0 0 2px #2e6ea3; }
+.theme-summer .moat { height: 10px; background: repeating-linear-gradient(90deg, #8a5f32 0 12px, #5e3e1c 12px 17px); box-shadow: 0 0 0 2px #e9d8b4; }

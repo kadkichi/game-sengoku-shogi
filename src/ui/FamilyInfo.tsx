@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { FAMILIES, type ClanId, type FamilyId } from '../data/families';
 import { MAP_POINTS } from '../data/map';
 import { play } from '../audio/sound';
-import { Chara, MON, specialOf } from './Chara';
+import { Chara, monOf, specialOf } from './Chara';
 import { useStage } from './Stage';
 
 /** 家紋を丸の中に大きく描く */
@@ -11,7 +11,7 @@ export function Crest({ family, size }: { family: FamilyId; size: number }) {
   return (
     <svg width={size} height={size} viewBox="-12 -12 24 24" role="img" aria-label={`${FAMILIES[family].name}の家紋`} style={{ display: 'block' }}>
       <circle r={11.4} fill={c.border} stroke="#fff" strokeWidth={0.8} />
-      <path d={MON[family]} fill={c.monFill} transform="scale(1.15)" />
+      <path d={monOf(family)} fill={c.monFill} transform="scale(1.15)" />
     </svg>
   );
 }
