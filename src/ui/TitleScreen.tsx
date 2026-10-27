@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import type { FamilyId } from '../data/families';
-import { PLAY_MENU, type BattleId } from '../data/battles';
+import { BATTLES, BATTLE_IDS, type BattleId } from '../data/battles';
 import { play } from '../audio/sound';
 import { FamilyInfo } from './FamilyInfo';
 import { RulesDialog } from './RulesDialog';
@@ -84,21 +84,35 @@ export function TitleScreen({ onStart }: { onStart: (mode: PlayMode, battle: Bat
             <h2 style={{ margin: 0, fontSize: compact ? 26 : 30, fontWeight: 800 }}>
               {menu === 'solo' ? 'ひとりで あそぶ' : 'ふたりで あそぶ'} ― どの たたかいに する?
             </h2>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: compact ? 12 : 18, width: '100%' }}>
-              {PLAY_MENU.map((m) => (
+            {/* 大名どうしの たたかい (ふつうの対戦) */}
+            <button
+              className="btn play-choice"
+              style={{ width: '100%', height: compact ? 70 : 92 }}
+              onClick={() => {
+                play('tap');
+                setMenu(null);
+                onStart(menu, null);
+              }}
+            >
+              <span style={{ fontSize: compact ? 26 : 32, letterSpacing: '0.05em' }}>大名どうしの たたかい</span>
+              <span style={{ fontSize: compact ? 13 : 15, fontWeight: 700, opacity: 0.9 }}>12の 大名家から えらぶ</span>
+            </button>
+            {/* 歴史の たたかい (合戦モード)。年の順に並べる */}
+            <div className="play-section">歴史の たたかい</div>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${BATTLE_IDS.length}, 1fr)`, gap: compact ? 10 : 14, width: '100%' }}>
+              {BATTLE_IDS.map((id) => (
                 <button
-                  key={m.name}
-                  className={`btn play-choice${m.battle ? ' battle' : ''}`}
-                  disabled={!m.ready}
-                  style={{ height: compact ? 72 : 96 }}
+                  key={id}
+                  className="btn play-choice battle"
+                  style={{ height: compact ? 64 : 80, borderRadius: 22 }}
                   onClick={() => {
                     play('tap');
                     setMenu(null);
-                    onStart(menu, m.battle);
+                    onStart(menu, id);
                   }}
                 >
-                  <span style={{ fontSize: compact ? 24 : 28, letterSpacing: '0.05em' }}>{m.name}</span>
-                  <span style={{ fontSize: compact ? 13 : 15, fontWeight: 700, opacity: 0.9 }}>{m.sub}</span>
+                  <span style={{ fontSize: compact ? 20 : 23, letterSpacing: '0.03em' }}>{BATTLES[id].name}</span>
+                  <span style={{ fontSize: compact ? 12 : 14, fontWeight: 700, color: '#ffe38a' }}>{BATTLES[id].year}年</span>
                 </button>
               ))}
             </div>
