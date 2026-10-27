@@ -18,7 +18,7 @@ export function CharacterSheet() {
     );
   }
   if (only === 'mon') {
-    // ?chars=mon: 12家の家紋の一覧
+    // ?chars=mon: 大名家の家紋の一覧
     return (
       <div style={{ position: 'absolute', inset: 0, background: '#fff', padding: 24, display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 16, alignContent: 'start' }}>
         {FAMILY_IDS.map((id) => (

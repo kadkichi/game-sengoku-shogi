@@ -1,4 +1,4 @@
-/** 12の大名家 */
+/** 大名家 */
 export type ClanId =
   | 'oda'
   | 'takeda'
@@ -343,7 +343,7 @@ FAMILIES.summerToyotomi = osaka(OSAKA_TOYOTOMI, 'summerToyotomi', {
 
 export const ARMY_IDS: ArmyId[] = ['east', 'west', 'winterTokugawa', 'winterToyotomi', 'summerTokugawa', 'summerToyotomi'];
 
-/** 12の大名家 (ふつうの対戦で選べる家) */
+/** 大名家 (ふつうの対戦で選べる家) */
 export const FAMILY_IDS: ClanId[] = [
   'oda', 'takeda', 'uesugi', 'toyotomi',
   'tokugawa', 'mori', 'hojo', 'imagawa',

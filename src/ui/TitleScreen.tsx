@@ -95,7 +95,7 @@ export function TitleScreen({ onStart }: { onStart: (mode: PlayMode, battle: Bat
               }}
             >
               <span style={{ fontSize: compact ? 26 : 32, letterSpacing: '0.05em' }}>大名どうしの たたかい</span>
-              <span style={{ fontSize: compact ? 13 : 15, fontWeight: 700, opacity: 0.9 }}>12の 大名家から えらぶ</span>
+              <span style={{ fontSize: compact ? 13 : 15, fontWeight: 700, opacity: 0.9 }}>好きな 大名家を えらぶ</span>
             </button>
             {/* 歴史の たたかい (合戦モード)。年の順に並べる */}
             <div className="play-section">歴史の たたかい</div>

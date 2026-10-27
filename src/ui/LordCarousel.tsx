@@ -5,14 +5,14 @@ import { Chara } from './Chara';
 import { useStage } from './Stage';
 
 const N = FAMILY_IDS.length;
-/** 12人を3回並べて、真ん中の組を見せる。端まで来たら気づかれないように真ん中の組へ戻す */
+/** 全員を3回並べて、真ん中の組を見せる。端まで来たら気づかれないように真ん中の組へ戻す */
 const ITEMS = [...FAMILY_IDS, ...FAMILY_IDS, ...FAMILY_IDS];
 const INTERVAL = 2400;
 
 const prefersReducedMotion = () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 /**
- * タイトル画面: 12家の大将が横にスライドしていくカルーセル。スワイプや矢印でも動かせる。
+ * タイトル画面: 大名家の大将が横にスライドしていくカルーセル。スワイプや矢印でも動かせる。
  * 大将を押すと onSelect で その家を知らせる (紹介を開いているあいだは止める)
  */
 export function LordCarousel({ onSelect, stopped = false }: { onSelect: (id: FamilyId) => void; stopped?: boolean }) {
@@ -83,7 +83,7 @@ export function LordCarousel({ onSelect, stopped = false }: { onSelect: (id: Fam
     <div
       role="region"
       aria-roledescription="カルーセル"
-      aria-label="12の大名家"
+      aria-label="大名家"
       style={{ position: 'relative', width: w, height, overflow: 'hidden', touchAction: 'pan-y' }}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
