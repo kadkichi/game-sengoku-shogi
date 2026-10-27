@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FAMILIES, FAMILY_IDS, MODES, type FamilyId } from '../data/families';
+import { FAMILIES, FAMILY_IDS, MODES, type ClanId, type FamilyId } from '../data/families';
 import { ISLANDS, MAP_H, MAP_POINTS, MAP_W } from '../data/map';
 import type { Side, Variant } from '../engine/types';
 import { play } from '../audio/sound';
@@ -17,15 +17,15 @@ interface Props {
   onStart: (families: Record<Side, FamilyId>, variant: Variant, cpu: CpuSetting | null) => void;
 }
 
-const other = (s: Side): Side => (s === 'sente' ? 'gote' : 'sente');
+export const other = (s: Side): Side => (s === 'sente' ? 'gote' : 'sente');
 
-const SIDE_NAME: Record<Side, string> = { sente: '先手', gote: '後手' };
+export const SIDE_NAME: Record<Side, string> = { sente: '先手', gote: '後手' };
 const SIDE_SUB: Record<Side, string> = { sente: 'さきに うごく', gote: 'あとから うごく' };
-const SIDE_COLOR: Record<Side, string> = { sente: '#D0392E', gote: '#2E5E8C' };
+export const SIDE_COLOR: Record<Side, string> = { sente: '#D0392E', gote: '#2E5E8C' };
 
 /** スマホでは顔アイコンを大きくするので、地図の上下の端で切れないよう内側に寄せる */
 const iconPos = (id: FamilyId, compact: boolean): [number, number] => {
-  const [x, y] = MAP_POINTS[id].icon;
+  const [x, y] = MAP_POINTS[id as ClanId].icon;
   return compact ? [x, Math.max(125, Math.min(y, 585))] : [x, y];
 };
 
@@ -218,7 +218,7 @@ export function SelectScreen({ initial, initialVariant, initialCpu, solo, onBack
                   </span>
                   <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
                     <span className="label" style={compact ? { fontSize: 14 } : undefined}>
-                      {compact ? f.name : `${f.name} の 大将 (${MAP_POINTS[f.id].place})`}
+                      {compact ? f.name : `${f.name} の 大将 (${MAP_POINTS[f.id as ClanId].place})`}
                     </span>
                     <span style={{ fontSize: compact ? (f.lord.length > 4 ? 18 : 22) : f.lord.length > 4 ? 22 : 26, fontWeight: 800, lineHeight: 1.1 }}>{f.lord}</span>
                   </span>
@@ -325,7 +325,7 @@ const LEVELS: { level: CpuLevel; sub: string; color: string; shadow: string }[] 
 ];
 
 /** 「かいせん!」のあとに、CPU の強さを選ぶ窓 */
-function LevelPicker({ onPick, onCancel }: { onPick: (level: CpuLevel) => void; onCancel: () => void }) {
+export function LevelPicker({ onPick, onCancel }: { onPick: (level: CpuLevel) => void; onCancel: () => void }) {
   return (
     <div className="info-backdrop" onClick={onCancel}>
       <div

@@ -88,6 +88,10 @@ export const MON: Record<FamilyId, string> = {
   chosokabe: `${ring(7.6, 1.1)} ${kataba(0, 0, 1.55)} ${[0, 60, 120, 180, 240, 300].map((a) => { const [x, y] = at(4.1, a); return kataba(x, y, 1.45); }).join(' ')}`,
   // 六文銭: 四角い穴のあいた銭が 3枚ずつ2段
   sanada: [-5, 0, 5].flatMap((x) => [circle(x, -2.6, 2.2) + ' ' + squareHole(x, -2.6, 0.6), circle(x, 2.6, 2.2) + ' ' + squareHole(x, 2.6, 0.6)]).join(' '),
+  // 東軍: 徳川家康の 三つ葉葵
+  east: `${ring(7.6, 1.2)} ${[0, 120, 240].map((a) => heartLeaf(a, 0.6, 6.3, 50)).join(' ')}`,
+  // 西軍: 石田三成の 九曜
+  west: [circle(0, 0, 2.3), ...[0, 45, 90, 135, 180, 225, 270, 315].map((a) => { const [x, y] = at(5.2, a); return circle(x, y, 1.7); })].join(' '),
 };
 
 const tr = (x: number, y: number, s: number) => `translate(${x} ${y}) scale(${s})`;
@@ -124,8 +128,9 @@ interface Parts {
 
 export type CharaSpecial = 'yukimura' | 'kanetsugu';
 
-function parts(kind: Kind, fam: FamilyId, special?: CharaSpecial): Parts {
-  const C = FAMILIES[fam].colors;
+function parts(kind: Kind, colorFam: FamilyId, special?: CharaSpecial, look?: FamilyId): Parts {
+  const C = FAMILIES[colorFam].colors;
+  const fam = look ?? colorFam;
   const v: Parts = {
     backA: '', backFill: '#FFFFFF', backLines: '', backMonT: HIDE, horns: '',
     wLine: '', wLineColor: D, wLineW: 5, wA: '', wAFill: SILVER, wB: '', wBFill: D, wMonT: HIDE, wMonFill: GOLD,
@@ -369,7 +374,8 @@ export const specialOf = (name: string, originFamily: FamilyId): CharaSpecial | 
 
 /** デフォルメ武将キャラ。全身 (240x260) か胸から上 (160x160) */
 export const Chara = memo(function Chara({ kind, family, crop = 'full', mood = 'normal', size, title, special }: CharaProps) {
-  const v = parts(kind, family, special);
+  // 先鋒は 銀の武将の絵を使う。合戦モードの軍は、look の家の大将の見た目にする (色は その軍の色)
+  const v = parts(kind === 'V' ? 'S' : kind, family, special, FAMILIES[family].look);
   const C = FAMILIES[family].colors;
   const mon = MON[family];
   const bigStache = v.stache !== '';

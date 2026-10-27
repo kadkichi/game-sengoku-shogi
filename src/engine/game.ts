@@ -1,4 +1,4 @@
-import { FAMILIES, YUKIMURA, type FamilyId, type SkillType } from '../data/families';
+import { FAMILIES, type FamilyId, type SkillType } from '../data/families';
 import type { Action, Cell, GameEvent, GameState, Kind, Piece, Pos, Side, Snapshot, Variant } from './types';
 
 export const SIZES: Record<Variant, { cols: number; rows: number }> = {
@@ -14,6 +14,8 @@ const VECTORS: Record<Variant, Record<Kind, [number, number][]>> = {
     G: [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [0, 1]],
     S: [[-1, -1], [0, -1], [1, -1], [-1, 1], [1, 1]],
     P: [[0, -1]],
+    // 先鋒: 前・左・右
+    V: [[0, -1], [-1, 0], [1, 0]],
   },
   // 3×4: 金=たて・よこ、銀=ななめ
   small: {
@@ -21,6 +23,7 @@ const VECTORS: Record<Variant, Record<Kind, [number, number][]>> = {
     G: [[0, -1], [-1, 0], [1, 0], [0, 1]],
     S: [[-1, -1], [1, -1], [-1, 1], [1, 1]],
     P: [[0, -1]],
+    V: [[0, -1], [-1, 0], [1, 0]],
   },
 };
 /** 成った駒 (どちらのモードも 5×6 の金の動き) */
@@ -44,8 +47,8 @@ export const inEnemyZone = (state: Pick<GameState, 'rows' | 'variant'>, side: Si
   return side === 'sente' ? p.y < depth : p.y >= state.rows - depth;
 };
 
-/** 成れる駒。3×4 は足軽だけ */
-const canPromote = (variant: Variant, kind: Kind) => kind === 'P' || (variant === 'large' && kind === 'S');
+/** 成れる駒。3×4 は足軽だけ。5×6 は足軽・銀・先鋒 */
+const canPromote = (variant: Variant, kind: Kind) => kind === 'P' || (variant === 'large' && (kind === 'S' || kind === 'V'));
 
 /** 動ける方向 (盤上の向き。先手は上が前) */
 export const directions = (piece: Piece, variant: Variant): [number, number][] => {
@@ -54,13 +57,29 @@ export const directions = (piece: Piece, variant: Variant): [number, number][] =
   return vecs.map(([dx, dy]) => [dx * -f, dy * -f]);
 };
 
-/** 真田家の必殺技を使える幸村か (寝返った幸村や、相手の真田家の幸村は使えない) */
-export const isYukimura = (state: GameState, piece: Piece | null, side: Side): boolean =>
-  !!piece &&
-  piece.owner === side &&
-  piece.name === YUKIMURA &&
-  piece.originFamily === 'sanada' &&
-  state.families[side] === 'sanada';
+/**
+ * まっすぐ前に何マスでも進む技 (真田の六文銭・西軍の島津の退き口) を使える駒か。
+ * 自分の家の、決まった1人だけ (寝返った駒や、相手の同じ家の駒は使えない)
+ */
+export const isChargeUnit = (state: GameState, piece: Piece | null, side: Side): boolean => {
+  const skill = FAMILIES[state.families[side]].skill;
+  return (
+    !!piece && skill.type === 'charge' && piece.owner === side && piece.name === skill.unit && piece.originFamily === state.families[side]
+  );
+};
+
+/** 内応の密書: 寝返らせられる相手の駒の位置 (持ち駒に寝返り候補がいて、盤上にもう1人がいるとき) */
+export function turncoatTargets(state: GameState): Pos[] {
+  const side = state.turn;
+  const names = FAMILIES[state.families[side]].skill.turncoats ?? [];
+  const inHand = state.hands[side].filter((p) => names.includes(p.name)).map((p) => p.name);
+  if (inHand.length === 0) return [];
+  const out: Pos[] = [];
+  forEachPiece(state, (piece, at) => {
+    if (piece.owner !== side && names.includes(piece.name) && !inHand.includes(piece.name)) out.push(at);
+  });
+  return out;
+}
 
 export const pieceAt = (state: GameState, p: Pos): Cell => (inBounds(state, p) ? state.board[p.y][p.x] : null);
 
@@ -104,7 +123,11 @@ export function createGame(families: Record<Side, FamilyId>, variant: Variant = 
     row.forEach(([kind, name], x) => {
       board[back][x] = make(side, kind, name);
     });
-    for (const x of pawns) board[pawnRow][x] = make(side, 'P', '足軽');
+    // 合戦モードの軍は、足軽の代わりに名前のある先鋒を置く
+    const front = variant === 'large' && fam.vanguard ? (side === 'gote' ? [...fam.vanguard].reverse() : fam.vanguard) : null;
+    pawns.forEach((x, i) => {
+      board[pawnRow][x] = front ? make(side, 'V', front[i]) : make(side, 'P', '足軽');
+    });
   }
 
   const state: GameState = {
@@ -245,8 +268,8 @@ export function legalMoves(state: GameState, from: Pos): Pos[] {
         if (piece.kind === 'K') return [];
         moves = slide(state, from, DIAGONALS);
         break;
-      case 'yukimura':
-        if (!isYukimura(state, piece, state.turn)) return [];
+      case 'charge':
+        if (!isChargeUnit(state, piece, state.turn)) return [];
         moves = slide(state, from, [[0, forward(piece.owner)]]);
         break;
       default:
@@ -343,8 +366,10 @@ export function canActivateSkill(state: GameState): boolean {
     case 'kingDouble':
     case 'arrows':
     case 'slideDiag':
-    case 'yukimura':
+    case 'charge':
       return hasAnySkillMove(trial);
+    case 'naiou':
+      return turncoatTargets(state).length > 0;
     case 'drop2':
       return state.hands[state.turn].length >= 2 && legalDrops(trial, state.hands[state.turn][0].id).length > 0;
     case 'pull':
@@ -427,6 +452,19 @@ export function applyAction(prev: GameState, action: Action): GameState {
         return state;
       }
       if (type === 'undo') return undoLastTurn(state);
+      if (type === 'naiou') {
+        // 内応の密書: 盤上のもう1人が、その場で寝返る (出世はそのまま)。これで手番は終わり
+        state.skillUsed[side] = true;
+        state.turnFirst ??= action;
+        state.events.push({ type: 'skill', side, family: fam });
+        for (const at of turncoatTargets(state)) {
+          const piece = state.board[at.y][at.x] as Piece;
+          piece.owner = side;
+          state.events.push({ type: 'turncoat', side, piece: { ...piece }, at });
+        }
+        endTurn(state);
+        return state;
+      }
       state.skillPhase = { type, step: 1, moved: [] };
       return state;
     }

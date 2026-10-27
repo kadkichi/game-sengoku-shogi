@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import type { FamilyId } from './data/families';
+import type { ArmyId, FamilyId } from './data/families';
+import { BATTLES, type BattleId } from './data/battles';
+import { ArmySelectScreen } from './ui/ArmySelectScreen';
 import type { Side, Variant } from './engine/types';
 import type { CpuSetting } from './ai/cpu';
 import { BattleScreen, type BattleResult } from './ui/BattleScreen';
@@ -13,6 +15,7 @@ import { TitleScreen, type PlayMode } from './ui/TitleScreen';
 type Screen =
   | { name: 'title' }
   | { name: 'select' }
+  | { name: 'armySelect' }
   | { name: 'battle'; round: number }
   | { name: 'result'; result: BattleResult };
 
@@ -24,6 +27,10 @@ export default function App() {
   /** ひとりで (CPU と) 遊ぶか、ふたりで遊ぶか。タイトル画面で選ぶ */
   const [mode, setMode] = useState<PlayMode>('solo');
   const [round, setRound] = useState(0);
+  /** 合戦モード (関ヶ原など) で遊ぶときの合戦と、両軍。null ならふつうの対戦 */
+  const [battle, setBattle] = useState<BattleId | null>(null);
+  const [armies, setArmies] = useState<Record<Side, ArmyId>>({ sente: 'east', gote: 'west' });
+  const battleDef = battle ? BATTLES[battle] : null;
 
   const startBattle = () => {
     setRound(round + 1);
@@ -43,9 +50,10 @@ export default function App() {
     <Stage>
       {screen.name === 'title' && (
         <TitleScreen
-          onStart={(m) => {
+          onStart={(m, b) => {
             setMode(m);
-            setScreen({ name: 'select' });
+            setBattle(b);
+            setScreen(b ? { name: 'armySelect' } : { name: 'select' });
           }}
         />
       )}
@@ -64,11 +72,25 @@ export default function App() {
           }}
         />
       )}
+      {screen.name === 'armySelect' && battleDef && (
+        <ArmySelectScreen
+          battle={battleDef}
+          initial={armies}
+          initialCpu={cpu}
+          solo={mode === 'solo'}
+          onBack={() => setScreen({ name: 'title' })}
+          onStart={(a, c) => {
+            setArmies(a);
+            setCpu(c);
+            startBattle();
+          }}
+        />
+      )}
       {screen.name === 'battle' && (
         <BattleScreen
           key={screen.round}
-          families={families}
-          variant={variant}
+          families={battleDef ? armies : families}
+          variant={battleDef ? battleDef.variant : variant}
           cpu={cpu}
           onFinish={(result) => setScreen({ name: 'result', result })}
           onQuit={() => setScreen({ name: 'title' })}
@@ -78,8 +100,9 @@ export default function App() {
         <ResultScreen
           result={screen.result}
           cpu={cpu}
+          battle={battleDef}
           onRematch={startBattle}
-          onReselect={() => setScreen({ name: 'select' })}
+          onReselect={() => setScreen(battleDef ? { name: 'armySelect' } : { name: 'select' })}
           onTitle={() => setScreen({ name: 'title' })}
         />
       )}

@@ -1,4 +1,5 @@
-export type FamilyId =
+/** 12の大名家 */
+export type ClanId =
   | 'oda'
   | 'takeda'
   | 'uesugi'
@@ -12,6 +13,11 @@ export type FamilyId =
   | 'chosokabe'
   | 'sanada';
 
+/** 合戦モードの軍 (関ヶ原の東軍・西軍など)。大名家と同じ形のデータで持つ */
+export type ArmyId = 'east' | 'west';
+
+export type FamilyId = ClanId | ArmyId;
+
 /**
  * 必殺技の仕組み。見た目の名前は家ごとに違っても、仕組みが同じなら同じ type
  * shoot      足軽の前2マスまでの敵を取る (織田・今川)
@@ -24,7 +30,8 @@ export type FamilyId =
  * slideDiag  大将以外の駒1枚を斜めに何マスでも (伊達)
  * pull       相手の駒1枚を1マス引き寄せ、続けて自分の駒を1回動かせる (島津)
  * spawn      新しい足軽を1枚打つ (長宗我部)
- * yukimura   真田幸村がまっすぐ前に何マスでも (真田)
+ * charge     決まった1人 (skill.unit) がまっすぐ前に何マスでも (真田の幸村・西軍の島津義弘)
+ * naiou      持ち駒にいる寝返り候補がいれば、盤上のもう1人を寝返らせる。手番は終わる (東軍)
  */
 export type SkillType =
   | 'shoot'
@@ -37,7 +44,8 @@ export type SkillType =
   | 'slideDiag'
   | 'pull'
   | 'spawn'
-  | 'yukimura';
+  | 'charge'
+  | 'naiou';
 
 export interface Family {
   id: FamilyId;
@@ -57,7 +65,15 @@ export interface Family {
     smallNote?: string;
     /** 発動したときの掛け声 */
     phrase: string;
+    /** charge: 技を使える駒の名前 */
+    unit?: string;
+    /** naiou: 寝返らせられる武将 (1人を持ち駒にすると、盤上のもう1人を寝返らせられる) */
+    turncoats?: string[];
   };
+  /** 合戦モードの軍だけ: 足軽の場所に置く先鋒3人 (先手から見て左から) */
+  vanguard?: [string, string, string];
+  /** 大将の絵を、この家の大将の見た目にする (東軍の徳川家康など) */
+  look?: ClanId;
   colors: {
     main: string;
     /** 枠・ラベル。白文字を載せるので濃い色 */
@@ -187,22 +203,50 @@ export const FAMILIES: Record<FamilyId, Family> = {
     id: 'sanada', name: '真田家', army: '真田軍', lord: '真田昌幸',
     gold: ['真田幸村', '真田信之'], silver: ['猿飛佐助', '霧隠才蔵'],
     skill: {
-      type: 'yukimura', name: '六文銭', phrase: '日本一の兵、見参!',
+      type: 'charge', name: '六文銭', unit: '真田幸村', phrase: '日本一の兵、見参!',
       short: '真田幸村が まっすぐ前に 何マスでも すすむ',
       desc: '真田幸村が、まっすぐ前に 何マスでも すすむ (駒は とびこえない。とまった先の てきは とれる。幸村が とられたら 使えない)',
     },
     colors: { main: '#B0201C', border: '#8E1A16', tile: '#FBE3E1', helm: '#B0201C', trim: '#2B2B2B', monFill: GOLD },
   },
+
+  // ---- 合戦モード: 関ヶ原 ----
+  // じっくり (5×6) の並び: 奥の段は 左から 銀(silver[1])・金(gold[0])・大将・金(gold[1])・銀(silver[0])、足軽の段に先鋒3人
+  east: {
+    id: 'east', name: '東軍', army: '東軍', lord: '徳川家康', look: 'tokugawa',
+    gold: ['本多忠勝', '井伊直政'], silver: ['黒田長政', '福島正則'],
+    vanguard: ['藤堂高虎', '細川忠興', '加藤嘉明'],
+    skill: {
+      type: 'naiou', name: '内応の密書', phrase: '約束を 果たされよ!',
+      short: '小早川か吉川の1人を もちごまに すると、盤に のこった もう1人を 寝返らせる',
+      desc: '小早川秀秋か吉川広家の1人を とって もちごまに していると、盤の上に のこった もう1人を 東軍に 寝返らせる (出世していれば そのまま。これで 手番は おわり)',
+      turncoats: ['小早川秀秋', '吉川広家'],
+    },
+    colors: { main: '#2F6B3A', border: '#2F6B3A', tile: '#E6F4E4', helm: '#2F6B3A', trim: GOLD, monFill: GOLD },
+  },
+  west: {
+    id: 'west', name: '西軍', army: '西軍', lord: '石田三成',
+    // 小早川・吉川は 奥の段の両端 (すぐには とられない位置)
+    gold: ['島津義弘', '大谷吉継'], silver: ['吉川広家', '小早川秀秋'],
+    vanguard: ['宇喜多秀家', '小西行長', '島左近'],
+    skill: {
+      type: 'charge', name: '島津の退き口', phrase: 'チェスト!', unit: '島津義弘',
+      short: '島津義弘が まっすぐ前に 何マスでも すすむ',
+      desc: '島津義弘が、まっすぐ前に 何マスでも すすむ (駒は とびこえない。とまった先の てきは とれる。島津が とられたら 使えない)',
+    },
+    colors: { main: '#6B3FA0', border: '#5B3290', tile: '#F0E8FA', helm: '#4A2A78', trim: GOLD, monFill: GOLD },
+  },
 };
 
-export const FAMILY_IDS: FamilyId[] = [
+export const ARMY_IDS: ArmyId[] = ['east', 'west'];
+
+/** 12の大名家 (ふつうの対戦で選べる家) */
+export const FAMILY_IDS: ClanId[] = [
   'oda', 'takeda', 'uesugi', 'toyotomi',
   'tokugawa', 'mori', 'hojo', 'imagawa',
   'date', 'shimazu', 'chosokabe', 'sanada',
 ];
 
-/** 真田家の必殺技を使える駒 */
-export const YUKIMURA = '真田幸村';
 
 export const MODES = {
   small: { label: 'かんたん', size: '3×4', desc: 'すぐ おわる。大将が 相手の一番奥に 入っても かち' },

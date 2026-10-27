@@ -16,8 +16,8 @@ const WIN = 1_000_000;
 
 /** 駒の価値。3×4 は金=たて・よこ、銀=ななめ なので少し低め */
 const VALUE: Record<GameState['variant'], Record<Kind, number>> = {
-  large: { K: 0, G: 6, S: 5, P: 1 },
-  small: { K: 0, G: 5, S: 4, P: 1 },
+  large: { K: 0, G: 6, S: 5, P: 1, V: 3 },
+  small: { K: 0, G: 5, S: 4, P: 1, V: 2 },
 };
 const PROMOTED = 6;
 /** 持ち駒は、どこにでも打てるぶん少し高く数える */

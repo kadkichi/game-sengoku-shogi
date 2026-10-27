@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FAMILIES, FAMILY_IDS } from '../data/families';
+import { ARMY_IDS, FAMILIES, FAMILY_IDS } from '../data/families';
 import type { Kind, Piece, Variant } from '../engine/types';
 import { play } from '../audio/sound';
 import { PieceTile } from './PieceTile';
@@ -12,7 +12,7 @@ const sample = (kind: Kind, promoted = false): Piece => ({
   kind,
   owner: 'sente',
   promoted,
-  name: { K: '織田信長', G: '柴田勝家', S: '羽柴秀吉', P: '足軽' }[kind],
+  name: { K: '織田信長', G: '柴田勝家', S: '羽柴秀吉', P: '足軽', V: '藤堂高虎' }[kind],
   originFamily: 'oda',
 });
 
@@ -53,6 +53,7 @@ export function RulesDialog({ variant, onClose }: { variant?: Variant; onClose: 
         <li>あいての駒が いる マスに うごくと、その駒を とれる</li>
         <li>自分の駒が いる マスには うごけない</li>
         {!variant && <li>じっくり (5×6) では 金と銀の うごきが すこし ちがう。盤の 駒の 点を 見てね</li>}
+        {variant !== 'small' && <li>関ヶ原の 合戦の「先鋒」(赤い「先」の しるし) は、前・左・右に 1マス。あいての陣で 出世する</li>}
       </ul>
     </div>,
 
@@ -119,7 +120,7 @@ export function RulesDialog({ variant, onClose }: { variant?: Variant; onClose: 
     <div key="skill" className="rules-page">
       <p className="rules-lead">ひっさつわざは 1局に 1かいだけ。自分の番に「つかう!」を おす</p>
       <div className="rules-skills">
-        {FAMILY_IDS.map((id) => {
+        {[...FAMILY_IDS, ...(variant === 'small' ? [] : ARMY_IDS)].map((id) => {
           const f = FAMILIES[id];
           return (
             <div key={id} className="rules-skill">

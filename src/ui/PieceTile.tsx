@@ -98,7 +98,9 @@ export function PieceTile({ piece, family, variant, cell, selected, target, shoo
             </span>
           </>
         )}
-        {piece.promoted && <span className="rank-badge">{piece.kind === 'P' ? '出世' : '武勲'}</span>}
+        {piece.promoted && <span className="rank-badge">{piece.kind === 'S' ? '武勲' : '出世'}</span>}
+        {/* 合戦モードの先鋒は、足軽と見分けられるように「先」の印をつける */}
+        {piece.kind === 'V' && !piece.promoted && <span className="tile-vanguard">先</span>}
       </div>
       <DirDots box={cell} half={(cell - 12) / 2} dirs={directions(piece, variant)} color={piece.promoted ? '#C98A00' : c.border} />
     </div>

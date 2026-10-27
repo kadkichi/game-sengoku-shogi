@@ -44,7 +44,7 @@ export interface BattleResult {
 const CELL: Record<Variant, number> = { small: 132, large: 96 };
 
 /** 駒を選んで動かす型の必殺技 */
-const MOVE_SKILLS = new Set(['double', 'kingDouble', 'arrows', 'slideDiag', 'yukimura']);
+const MOVE_SKILLS = new Set(['double', 'kingDouble', 'arrows', 'slideDiag', 'charge']);
 
 interface Props {
   families: Record<Side, FamilyId>;
@@ -278,11 +278,19 @@ export function BattleScreen({ families, variant, cpu, onFinish, onQuit }: Props
         }
         case 'promote':
           setJustPromoted(ev.piece.id);
-          say(ev.piece.kind === 'P' ? '出世!' : '武勲!', ev.piece.kind === 'P' ? '足軽が 武将なみに つよくなった' : `${ev.piece.name}が 武勲を あげた`);
+          if (ev.piece.kind === 'V') say('出世!', `先鋒 ${ev.piece.name}が 出世した`);
+          else say(ev.piece.kind === 'P' ? '出世!' : '武勲!', ev.piece.kind === 'P' ? '足軽が 武将なみに つよくなった' : `${ev.piece.name}が 武勲を あげた`);
           if (sound !== 'shoot') sound = 'promote';
           break;
         case 'shield':
           say('小田原城総構え!', `つぎの あいての番、${army}の駒は とられない`);
+          break;
+        case 'turncoat':
+          // 内応の密書: 盤上の駒が、その場で寝返る
+          setJustPromoted(ev.piece.id);
+          say('内応じゃ!', `${ev.piece.name}が ${army}に 寝返った`);
+          sound = 'promote';
+          busy = Math.max(busy, 900);
           break;
         case 'undo':
           say('まった!', `${FAMILIES[game.families[opponent(side)]].army}の さっきの手を なかったことにした`);
@@ -391,8 +399,8 @@ export function BattleScreen({ families, variant, cpu, onFinish, onQuit }: Props
         return `${name}の 前が ふさがっているよ`;
       case 'slideDiag':
         return piece.kind === 'K' ? '独眼竜では 大将は うごかせないよ' : `${name}は いま うごけないよ`;
-      case 'yukimura':
-        return '六文銭で うごかせるのは 真田幸村だけだよ';
+      case 'charge':
+        return `${turnFam.skill.name}で うごかせるのは ${turnFam.skill.unit}だけだよ`;
       default:
         return game.forbidden ? `${name}は いま うごけないよ (さっきと おなじ手は 指せない)` : `${name}は いま うごけないよ`;
     }
@@ -495,8 +503,8 @@ export function BattleScreen({ families, variant, cpu, onFinish, onQuit }: Props
       case 'slideDiag':
         hint = sel ? 'ななめの 光るマスに うごかそう' : 'ななめに うごかす駒を えらんでね';
         break;
-      case 'yukimura':
-        hint = '真田幸村を まっすぐ前に すすめよう';
+      case 'charge':
+        hint = `${turnFam.skill.unit}を まっすぐ前に すすめよう`;
         break;
     }
     if (step === 1) hintButtons.push(cancel);

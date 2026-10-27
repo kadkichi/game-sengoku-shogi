@@ -1,4 +1,4 @@
-import type { FamilyId } from './families';
+import type { ClanId } from './families';
 
 /** 大名選択の地図の大きさ (px)。SVG の座標もこの大きさ */
 export const MAP_W = 848;
@@ -17,7 +17,7 @@ export const ISLANDS = {
  * 各家の本拠地 (home) と、顔アイコンを置く場所 (icon)。
  * 中部地方は家が集まっているので、アイコンは海の上に置いて点線でつなぐ
  */
-export const MAP_POINTS: Record<FamilyId, { place: string; home: [number, number]; icon: [number, number] }> = {
+export const MAP_POINTS: Record<ClanId, { place: string; home: [number, number]; icon: [number, number] }> = {
   date: { place: '米沢', home: [705, 190], icon: [790, 250] },
   uesugi: { place: '越後', home: [585, 235], icon: [585, 110] },
   sanada: { place: '信濃 上田', home: [545, 305], icon: [395, 230] },

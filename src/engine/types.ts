@@ -1,8 +1,8 @@
 import type { FamilyId, SkillType } from '../data/families';
 
 export type Side = 'sente' | 'gote';
-/** K=大将 G=金の武将 S=銀の武将 P=足軽 */
-export type Kind = 'K' | 'G' | 'S' | 'P';
+/** K=大将 G=金の武将 S=銀の武将 P=足軽 V=先鋒 (合戦モードの、足軽の場所に置く武将) */
+export type Kind = 'K' | 'G' | 'S' | 'P' | 'V';
 
 /** small = 3×4 (かんたん)、large = 5×6 (じっくり) */
 export type Variant = 'small' | 'large';
@@ -46,6 +46,7 @@ export type GameEvent =
   | { type: 'undo'; side: Side }
   | { type: 'pull'; side: Side; piece: Piece; from: Pos; to: Pos }
   | { type: 'spawn'; side: Side; pieceId: string; to: Pos }
+  | { type: 'turncoat'; side: Side; piece: Piece; at: Pos }
   | { type: 'win'; side: Side; reason: WinReason }
   | { type: 'draw' };
 

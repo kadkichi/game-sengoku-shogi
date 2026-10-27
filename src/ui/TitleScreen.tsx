@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import type { FamilyId } from '../data/families';
+import { PLAY_MENU, type BattleId } from '../data/battles';
 import { play } from '../audio/sound';
 import { FamilyInfo } from './FamilyInfo';
 import { RulesDialog } from './RulesDialog';
@@ -9,15 +10,18 @@ import { useStage } from './Stage';
 
 export type PlayMode = 'solo' | 'duo';
 
-export function TitleScreen({ onStart }: { onStart: (mode: PlayMode) => void }) {
+/** ひとりで / ふたりで を押したあと、どのあそびかたにするかを選ぶ (battle が null なら大名のたたかい) */
+export function TitleScreen({ onStart }: { onStart: (mode: PlayMode, battle: BattleId | null) => void }) {
   const { compact } = useStage();
   const [info, setInfo] = useState<FamilyId | null>(null);
   const closeInfo = useCallback(() => setInfo(null), []);
   const [rules, setRules] = useState(false);
+  /** あそびかたを選ぶ窓 (押したのが ひとりで か ふたりで か) */
+  const [menu, setMenu] = useState<PlayMode | null>(null);
   return (
     <div className="screen screen-sky">
       <Scenery />
-      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: compact ? 10 : 18 }}>
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: compact ? 6 : 16 }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: compact ? 2 : 6 }}>
           <div style={{ fontSize: compact ? 20 : 22, fontWeight: 800, letterSpacing: '0.3em', paddingLeft: '0.3em', color: 'var(--blue)' }}>せんごく しょうぎ</div>
           <h1 className="display" style={{ margin: 0, fontSize: compact ? 92 : 128, lineHeight: 1.05, textShadow: '0 6px 0 #fff' }}>
@@ -44,7 +48,7 @@ export function TitleScreen({ onStart }: { onStart: (mode: PlayMode) => void }) 
               }}
               onClick={() => {
                 play('tap');
-                onStart(mode);
+                setMenu(mode);
               }}
             >
               <span style={{ fontSize: compact ? 30 : 32, letterSpacing: '0.08em' }}>{label}</span>
@@ -67,6 +71,43 @@ export function TitleScreen({ onStart }: { onStart: (mode: PlayMode) => void }) 
       >
         あそびかた
       </button>
+      {menu && (
+        <div className="info-backdrop" onClick={() => setMenu(null)}>
+          <div
+            className="info-card"
+            role="dialog"
+            aria-modal="true"
+            aria-label="あそびかたを えらぶ"
+            onClick={(e) => e.stopPropagation()}
+            style={{ flexDirection: 'column', gap: compact ? 12 : 20, padding: compact ? '16px 32px 18px' : '28px 44px 30px', borderColor: menu === 'solo' ? '#d0392e' : '#2e5e8c', width: 760 }}
+          >
+            <h2 style={{ margin: 0, fontSize: compact ? 26 : 30, fontWeight: 800 }}>
+              {menu === 'solo' ? 'ひとりで あそぶ' : 'ふたりで あそぶ'} ― どの たたかいに する?
+            </h2>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: compact ? 12 : 18, width: '100%' }}>
+              {PLAY_MENU.map((m) => (
+                <button
+                  key={m.name}
+                  className={`btn play-choice${m.battle ? ' battle' : ''}`}
+                  disabled={!m.ready}
+                  style={{ height: compact ? 72 : 96 }}
+                  onClick={() => {
+                    play('tap');
+                    setMenu(null);
+                    onStart(menu, m.battle);
+                  }}
+                >
+                  <span style={{ fontSize: compact ? 24 : 28, letterSpacing: '0.05em' }}>{m.name}</span>
+                  <span style={{ fontSize: compact ? 13 : 15, fontWeight: 700, opacity: 0.9 }}>{m.sub}</span>
+                </button>
+              ))}
+            </div>
+            <button className="btn btn-ghost" onClick={() => setMenu(null)}>
+              もどる
+            </button>
+          </div>
+        </div>
+      )}
       {info && <FamilyInfo family={info} onClose={closeInfo} />}
       {rules && <RulesDialog onClose={() => setRules(false)} />}
     </div>

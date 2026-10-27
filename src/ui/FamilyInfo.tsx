@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { FAMILIES, type FamilyId } from '../data/families';
+import { FAMILIES, type ClanId, type FamilyId } from '../data/families';
 import { MAP_POINTS } from '../data/map';
 import { play } from '../audio/sound';
 import { Chara, MON, specialOf } from './Chara';
@@ -59,7 +59,7 @@ export function FamilyInfo({ family, onClose }: { family: FamilyId; onClose: () 
             <h2 className="display" style={{ margin: 0, fontSize: compact ? 44 : 52, fontWeight: 400, lineHeight: 1.1 }}>
               {f.name}
             </h2>
-            <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--muted)' }}>本拠地: {MAP_POINTS[family].place}</span>
+            <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--muted)' }}>本拠地: {MAP_POINTS[family as ClanId]?.place}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span className="label" style={{ fontSize: 15 }}>大将</span>

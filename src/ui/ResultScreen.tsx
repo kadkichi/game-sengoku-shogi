@@ -2,6 +2,7 @@ import { FAMILIES } from '../data/families';
 import type { Side } from '../engine/types';
 import type { BattleResult } from './BattleScreen';
 import type { CpuSetting } from '../ai/cpu';
+import type { BattleDef } from '../data/battles';
 import { Chara } from './Chara';
 import { Scenery } from './Scenery';
 import { useStage } from './Stage';
@@ -10,6 +11,8 @@ interface Props {
   result: BattleResult;
   /** CPU と対戦したときの設定 (「あなたの かち」を出すため) */
   cpu: CpuSetting | null;
+  /** 合戦モードなら、その合戦 (見出しの言葉が変わる) */
+  battle?: BattleDef | null;
   onRematch: () => void;
   onReselect: () => void;
   onTitle: () => void;
@@ -17,7 +20,7 @@ interface Props {
 
 const COLORS = ['#E2483D', '#F5C033', '#2F80ED', '#F2994A', '#7CC86E', '#23407A'];
 
-export function ResultScreen({ result, cpu, onRematch, onReselect, onTitle }: Props) {
+export function ResultScreen({ result, cpu, battle, onRematch, onReselect, onTitle }: Props) {
   const { w, compact } = useStage();
   const { winner, families, moveCount } = result;
   const loser: Side | null = winner ? (winner === 'sente' ? 'gote' : 'sente') : null;
@@ -54,6 +57,7 @@ export function ResultScreen({ result, cpu, onRematch, onReselect, onTitle }: Pr
           <span style={{ fontSize: compact ? 20 : 22, fontWeight: 800, letterSpacing: '0.3em', paddingLeft: '0.3em', color: '#b35a00' }}>
             {!winner ? 'しょうぶ つかず' : !cpu ? 'しょうぶあり!' : winner === cpu.side ? 'CPUの かち… もういっかい!' : 'あなたの かち!'}
           </span>
+          {battle && <span style={{ fontSize: compact ? 22 : 26, fontWeight: 800, letterSpacing: '0.2em' }}>{battle.resultLead}</span>}
           <h1 className="display" style={{ margin: 0, fontSize: compact ? 64 : 84, lineHeight: 1.15 }}>
             {winFam ? `${winFam.name}の かち!` : 'ひきわけ!'}
           </h1>
@@ -83,7 +87,7 @@ export function ResultScreen({ result, cpu, onRematch, onReselect, onTitle }: Pr
               style={{ width: 260, height: compact ? 62 : 68, borderRadius: 34, fontSize: 20, background: '#fff', color: 'var(--blue)', border: '3px solid var(--blue)', boxShadow: '0 6px 0 var(--line)' }}
               onClick={onReselect}
             >
-              大名を えらびなおす
+              {battle ? '軍を えらびなおす' : '大名を えらびなおす'}
             </button>
           </div>
         </div>
