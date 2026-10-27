@@ -15,22 +15,26 @@ export const ISLANDS = {
 
 /**
  * 各家の本拠地 (home) と、顔アイコンを置く場所 (icon)。
- * 中部地方は家が集まっているので、アイコンは海の上に置いて点線でつなぐ
+ * 中部・近畿は家が集まっているので、アイコンは 北の列 (日本海側) と 南の列 (太平洋側) に
+ * 西から東へ並べて、本拠地と点線でつなぐ。アイコンは陸に少しかかってもよい
  */
 export const MAP_POINTS: Record<ClanId, { place: string; home: [number, number]; icon: [number, number] }> = {
-  date: { place: '米沢', home: [705, 190], icon: [790, 250] },
-  uesugi: { place: '越後', home: [585, 235], icon: [585, 110] },
-  sanada: { place: '信濃 上田', home: [545, 305], icon: [395, 230] },
-  takeda: { place: '甲斐', home: [580, 345], icon: [485, 150] },
-  hojo: { place: '相模 小田原', home: [640, 365], icon: [780, 390] },
-  imagawa: { place: '駿河', home: [590, 385], icon: [690, 470] },
-  tokugawa: { place: '三河', home: [535, 398], icon: [590, 545] },
-  oda: { place: '尾張', home: [490, 395], icon: [490, 600] },
-  toyotomi: { place: '大坂', home: [380, 412], icon: [400, 610] },
-  mori: { place: '安芸', home: [245, 410], icon: [215, 310] },
-  chosokabe: { place: '土佐', home: [305, 512], icon: [300, 615] },
-  shimazu: { place: '薩摩', home: [135, 595], icon: [215, 625] },
-  // 本願寺 (石山) は大坂城と同じ場所なので、少し北にずらして 日本海側の海にアイコンを置く
-  honganji: { place: '摂津 石山', home: [372, 400], icon: [300, 215] },
-  asai: { place: '近江 小谷', home: [440, 360], icon: [360, 118] },
+  // 北の列 (西から)
+  mori: { place: '安芸', home: [245, 410], icon: [185, 335] },
+  honganji: { place: '摂津 石山', home: [372, 400], icon: [265, 278] },
+  ashikaga: { place: '山城 京都', home: [405, 382], icon: [345, 238] },
+  asai: { place: '近江 小谷', home: [440, 360], icon: [422, 182] },
+  saito: { place: '美濃 稲葉山', home: [478, 378], icon: [502, 140] },
+  sanada: { place: '信濃 上田', home: [545, 305], icon: [585, 118] },
+  uesugi: { place: '越後', home: [585, 235], icon: [672, 168] },
+  date: { place: '米沢', home: [705, 190], icon: [790, 238] },
+  // 東と南の列 (東から)
+  takeda: { place: '甲斐', home: [580, 345], icon: [655, 278] },
+  hojo: { place: '相模 小田原', home: [640, 365], icon: [785, 365] },
+  imagawa: { place: '駿河', home: [590, 385], icon: [705, 462] },
+  tokugawa: { place: '三河', home: [535, 398], icon: [610, 535] },
+  oda: { place: '尾張', home: [500, 398], icon: [512, 585] },
+  toyotomi: { place: '大坂', home: [380, 412], icon: [412, 600] },
+  chosokabe: { place: '土佐', home: [305, 512], icon: [312, 628] },
+  shimazu: { place: '薩摩', home: [135, 595], icon: [212, 640] },
 };

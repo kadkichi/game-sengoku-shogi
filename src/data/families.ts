@@ -13,7 +13,9 @@ export type ClanId =
   | 'chosokabe'
   | 'sanada'
   | 'honganji'
-  | 'asai';
+  | 'asai'
+  | 'ashikaga'
+  | 'saito';
 
 /** 合戦モードの軍 (関ヶ原の東軍・西軍など)。大名家と同じ形のデータで持つ */
 export type ArmyId = 'east' | 'west' | 'winterTokugawa' | 'winterToyotomi' | 'summerTokugawa' | 'summerToyotomi';
@@ -37,6 +39,8 @@ export type FamilyId = ClanId | ArmyId;
  * fort       決まった1人 (skill.unit) と まわり8マスの味方は、次の相手の番 取られない。手番を使わない (冬の陣の豊臣方)
  * cannon     相手の陣 (奥2段) にいる駒を1枚、どこからでも取る。大将は取れない (冬の陣の徳川方)
  * flank      持ち駒1枚を 敵の大将の真後ろに置き (その駒はこの手番 動けない)、別に ふつうの1手もする (浅井)
+ * sword      大将のとなりにいる敵1枚を、大将は動かずに取る。敵の大将は取れない (足利)
+ * gekokujo   自分の足軽1枚を その場で出世させ、続けて その足軽を1回動かす (斎藤)
  */
 export type SkillType =
   | 'shoot'
@@ -53,7 +57,9 @@ export type SkillType =
   | 'naiou'
   | 'fort'
   | 'cannon'
-  | 'flank';
+  | 'flank'
+  | 'sword'
+  | 'gekokujo';
 
 export interface Family {
   id: FamilyId;
@@ -241,6 +247,27 @@ export const FAMILIES = {
     colors: { main: '#3E8ED0', border: '#2B6CA8', tile: '#E3F0FB', helm: '#2B6CA8', trim: '#FFFFFF', monFill: '#FFFFFF' },
   },
 
+  ashikaga: {
+    id: 'ashikaga', name: '足利家', army: '足利軍', lord: '足利義輝',
+    gold: ['細川藤孝', '三淵藤英'], silver: ['和田惟政', '一色藤長'],
+    skill: {
+      type: 'sword', name: '剣豪将軍', phrase: '将軍の 太刀を うけよ!',
+      short: '大将の となりの 敵を 1まい、大将は うごかずに とる',
+      desc: '大将の となり8マスに いる 敵を 1まい、大将は うごかずに とる (敵の大将は とれない)',
+    },
+    colors: { main: '#8A7536', border: '#6E5C26', tile: '#FBF6E6', helm: '#2B2B2B', trim: GOLD, monFill: '#FFFFFF' },
+  },
+  saito: {
+    id: 'saito', name: '斎藤家', army: '斎藤軍', lord: '斎藤道三',
+    gold: ['斎藤義龍', '安藤守就'], silver: ['稲葉一鉄', '氏家卜全'],
+    skill: {
+      type: 'gekokujo', name: '下剋上', phrase: '油売りから 国盗りじゃ!',
+      short: '足軽を 1まい その場で 出世させて、つづけて うごかす',
+      desc: '自分の 足軽を 1まい その場で 出世させて、つづけて その足軽を 1かい うごかす',
+    },
+    colors: { main: '#A07818', border: '#86620F', tile: '#FAF0D6', helm: '#86620F', trim: GOLD, monFill: '#FFF3C4' },
+  },
+
   // ---- 合戦モード: 関ヶ原 ----
   // じっくり (5×6) の並び: 奥の段は 左から 銀(silver[1])・金(gold[0])・大将・金(gold[1])・銀(silver[0])、足軽の段に先鋒3人
   east: {
@@ -321,7 +348,7 @@ export const FAMILY_IDS: ClanId[] = [
   'oda', 'takeda', 'uesugi', 'toyotomi',
   'tokugawa', 'mori', 'hojo', 'imagawa',
   'date', 'shimazu', 'chosokabe', 'sanada',
-  'honganji', 'asai',
+  'honganji', 'asai', 'ashikaga', 'saito',
 ];
 
 

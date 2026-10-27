@@ -5,6 +5,8 @@ import {
   cannonTargets,
   flankState,
   flankTargets,
+  swordTargets,
+  upliftTargets,
   turncoatTargets,
   legalDrops,
   legalMoves,
@@ -81,6 +83,16 @@ function expand(state: GameState, start: GameState, prefix: Action[], out: Turn[
       break;
     case 'cannon':
       for (const to of cannonTargets(state)) next({ type: 'bombard', to });
+      break;
+    case 'sword':
+      for (const to of swordTargets(state)) next({ type: 'strike', to });
+      break;
+    case 'gekokujo':
+      if (phase.step === 1) {
+        for (const at of upliftTargets(state)) next({ type: 'uplift', at });
+      } else {
+        for (const from of ownPieces(state)) for (const to of legalMoves(state, from)) next({ type: 'move', from, to });
+      }
       break;
     case 'flank': {
       // 挟み撃ち: 置く (持ち駒の種類ごと) と、ふつうの1手 (動かす・相手の近くに打つ) の、まだしていないほう

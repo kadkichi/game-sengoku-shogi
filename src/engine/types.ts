@@ -39,7 +39,7 @@ export interface SkillPhase {
 export type GameEvent =
   | { type: 'move'; side: Side; pieceId: string; from: Pos; to: Pos }
   | { type: 'drop'; side: Side; pieceId: string; to: Pos }
-  | { type: 'capture'; side: Side; piece: Piece; at: Pos; by: 'move' | 'shoot' }
+  | { type: 'capture'; side: Side; piece: Piece; at: Pos; by: 'move' | 'shoot' | 'sword' }
   | { type: 'promote'; side: Side; piece: Piece; at: Pos }
   | { type: 'skill'; side: Side; family: FamilyId }
   | { type: 'shield'; side: Side }
@@ -63,7 +63,9 @@ export type Action =
   | { type: 'spawn'; to: Pos }
   | { type: 'turncoat'; at: Pos }
   | { type: 'bombard'; to: Pos }
-  | { type: 'flank'; pieceId: string; to: Pos };
+  | { type: 'flank'; pieceId: string; to: Pos }
+  | { type: 'strike'; to: Pos }
+  | { type: 'uplift'; at: Pos };
 
 /** 鳴くまで待とう で戻すための、ある手番の始まりの局面 */
 export type Snapshot = Omit<GameState, 'thisTurnStart' | 'lastTurnStart' | 'events'>;

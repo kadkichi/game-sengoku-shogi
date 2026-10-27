@@ -119,6 +119,31 @@ export function flankTargets(state: GameState, pieceId: string): Pos[] {
   return [to];
 }
 
+/** 剣豪将軍: 大将のとなり8マスにいる、斬れる敵 (敵の大将は斬れない) */
+export function swordTargets(state: GameState): Pos[] {
+  const king = findKing(state, state.turn);
+  if (!king) return [];
+  const out: Pos[] = [];
+  for (let dy = -1; dy <= 1; dy++)
+    for (let dx = -1; dx <= 1; dx++) {
+      const to = { x: king.x + dx, y: king.y + dy };
+      const target = pieceAt(state, to);
+      if (!target || target.owner === state.turn || target.kind === 'K') continue;
+      if (isShielded(state, to) || isForbidden(state, { type: 'strike', to })) continue;
+      out.push(to);
+    }
+  return out;
+}
+
+/** 下剋上: 出世させられる自分の足軽 (まだ出世していないもの) */
+export function upliftTargets(state: GameState): Pos[] {
+  const out: Pos[] = [];
+  forEachPiece(state, (piece, at) => {
+    if (piece.owner === state.turn && piece.kind === 'P' && !piece.promoted && !isForbidden(state, { type: 'uplift', at })) out.push(at);
+  });
+  return out;
+}
+
 /** 大筒の砲撃: 撃てる相手の駒 (相手の陣 = こちらから見た敵陣にいる、大将以外) */
 export function cannonTargets(state: GameState): Pos[] {
   const side = state.turn;
@@ -283,6 +308,8 @@ const isForbidden = (state: GameState, action: Action) => {
     return samePos(f.from, action.from) && samePos(f.to, action.to);
   if (f.type === 'turncoat' && action.type === 'turncoat') return samePos(f.at, action.at);
   if (f.type === 'bombard' && action.type === 'bombard') return samePos(f.to, action.to);
+  if (f.type === 'strike' && action.type === 'strike') return samePos(f.to, action.to);
+  if (f.type === 'uplift' && action.type === 'uplift') return samePos(f.at, action.at);
   if (f.type === 'drop' && action.type === 'drop') return f.pieceId === action.pieceId && samePos(f.to, action.to);
   if (f.type === 'spawn' && action.type === 'spawn') return samePos(f.to, action.to);
   return false;
@@ -325,6 +352,11 @@ export function legalMoves(state: GameState, from: Pos): Pos[] {
       case 'slideDiag':
         if (piece.kind === 'K') return [];
         moves = slide(state, from, DIAGONALS);
+        break;
+      case 'gekokujo':
+        // 下剋上: 出世させた足軽だけを 1回動かす
+        if (phase.step < 2 || piece.id !== phase.moved[0]) return [];
+        moves = pseudoMoves(state, from);
         break;
       case 'flank': {
         // 挟み撃ち: ふつうの1手。置いた駒は この手番 動けない
@@ -442,6 +474,10 @@ export function canActivateSkill(state: GameState): boolean {
       return cannonTargets(state).length > 0;
     case 'flank':
       return state.hands[state.turn].some((p) => flankTargets(trial, p.id).length > 0);
+    case 'sword':
+      return swordTargets(state).length > 0;
+    case 'gekokujo':
+      return upliftTargets(state).length > 0;
     case 'fort':
       return findUnit(state, state.turn) !== null;
     case 'drop2':
@@ -577,6 +613,27 @@ export function applyAction(prev: GameState, action: Action): GameState {
       afterFlankStep(state, `placed:${piece.id}`);
       return state;
     }
+    case 'strike': {
+      // 剣豪将軍: 大将のとなりの敵を、大将は動かずに斬る
+      if (phase?.type !== 'sword') fail('not sword');
+      if (!swordTargets(state).some((p) => samePos(p, action.to))) fail('illegal strike');
+      commit();
+      capture(state, action.to, 'sword');
+      endTurn(state);
+      return state;
+    }
+    case 'uplift': {
+      // 下剋上: 足軽をその場で出世させる。続けて その足軽を1回動かす
+      if (phase?.type !== 'gekokujo' || phase.step !== 1) fail('not gekokujo');
+      if (!upliftTargets(state).some((p) => samePos(p, action.at))) fail('illegal uplift');
+      commit();
+      const piece = state.board[action.at.y][action.at.x] as Piece;
+      piece.promoted = true;
+      state.events.push({ type: 'promote', side, piece: { ...piece }, at: action.at });
+      state.skillPhase = { type: 'gekokujo', step: 2, moved: [piece.id] };
+      if (legalMoves(state, action.at).length === 0) endTurn(state);
+      return state;
+    }
     case 'bombard': {
       // 大筒の砲撃: 相手の陣の駒を1枚取る
       if (phase?.type !== 'cannon') fail('not cannon');
@@ -707,7 +764,7 @@ function undoLastTurn(state: GameState): GameState {
   return next;
 }
 
-function capture(state: GameState, at: Pos, by: 'move' | 'shoot') {
+function capture(state: GameState, at: Pos, by: 'move' | 'shoot' | 'sword') {
   const side = state.turn;
   const target = state.board[at.y][at.x] as Piece;
   state.board[at.y][at.x] = null;

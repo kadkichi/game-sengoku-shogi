@@ -46,8 +46,8 @@ export function SelectScreen({ initial, initialVariant, initialCpu, solo, onBack
   const pad = compact ? 12 : 16;
   /** 地図は画面の高さに収まるよう縮める (ふつうの画面では等倍) */
   const mapScale = (h - topH - pad * 2) / MAP_H;
-  /** スマホでは顔アイコンを大きくして押しやすくする */
-  const chipScale = compact ? 1.3 : 1;
+  /** スマホでは顔アイコンを少し大きくして押しやすくする (大きすぎると となりと重なる) */
+  const chipScale = compact ? 1.12 : 1;
   const lines = FAMILY_IDS.map((id) => {
     const [hx, hy] = MAP_POINTS[id].home;
     const [ix, iy] = iconPos(id, compact);

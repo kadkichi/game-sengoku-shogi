@@ -8,6 +8,8 @@ import {
   flankState,
   flankTargets,
   isProtected,
+  swordTargets,
+  upliftTargets,
   turncoatTargets,
   createGame,
   directions,
@@ -51,7 +53,7 @@ export interface BattleResult {
 const CELL: Record<Variant, number> = { small: 132, large: 96 };
 
 /** 駒を選んで動かす型の必殺技 */
-const MOVE_SKILLS = new Set(['double', 'kingDouble', 'arrows', 'slideDiag', 'charge', 'flank']);
+const MOVE_SKILLS = new Set(['double', 'kingDouble', 'arrows', 'slideDiag', 'charge', 'flank', 'gekokujo']);
 
 interface Props {
   families: Record<Side, FamilyId>;
@@ -147,6 +149,8 @@ export function BattleScreen({ families, variant, cpu, battle, onFinish, onQuit 
     if (phaseType === 'spawn') return spawnTargets(game);
     if (phaseType === 'naiou') return turncoatTargets(game);
     if (phaseType === 'cannon') return cannonTargets(game);
+    if (phaseType === 'sword') return swordTargets(game);
+    if (phaseType === 'gekokujo' && phase?.step === 1) return upliftTargets(game);
     if (!sel) return [];
     // 挟み撃ち: まだ置いていなければ、持ち駒は 敵の大将の真後ろに置く。置いたあとは ふつうに打てる
     if (sel.type === 'hand') return phaseType === 'flank' && !flankState(game).placed ? flankTargets(game, sel.pieceId) : legalDrops(game, sel.pieceId);
@@ -265,11 +269,18 @@ export function BattleScreen({ families, variant, cpu, battle, onFinish, onQuit 
             showDefender(ev.piece, ev.at);
             busy = Math.max(busy, 900);
           }
+          if (ev.by === 'sword') {
+            // 剣豪将軍: 刀が交差して、その場で斬られる
+            showClash((ev.at.x + 0.5) * cell, (ev.at.y + 0.5) * cell, 'battle');
+            showDefender(ev.piece, ev.at);
+            later(150, () => play('clash'));
+            busy = Math.max(busy, 1000);
+          }
           if (ev.piece.kind === 'K') {
             say('勝負あり!', `大将 ${ev.piece.name}を とった!`);
             break;
           }
-          say(ev.by === 'shoot' ? 'ズドン!' : '寝返り!', `${ev.piece.name}が ${army}に 寝返った`);
+          say(ev.by === 'shoot' ? 'ズドン!' : ev.by === 'sword' ? '一閃!' : '寝返り!', `${ev.piece.name}が ${army}に 寝返った`);
           // ぶつかり合いが終わってから、取った駒が もちごまへ飛ぶ
           const at = ev.at;
           const piece = ev.piece;
@@ -423,6 +434,10 @@ export function BattleScreen({ families, variant, cpu, battle, onFinish, onQuit 
         return '寝返らせられるのは 光っている 武将だけだよ';
       case 'cannon':
         return '大筒で ねらえるのは 光っている 駒だけだよ';
+      case 'sword':
+        return '斬れるのは 大将の となりの 光っている 敵だけだよ';
+      case 'gekokujo':
+        return phase?.step === 1 ? '出世させられるのは 光っている 足軽だけだよ' : 'うごかせるのは 出世した 足軽だけだよ';
       case 'flank':
         if (piece.id === flankState(game).placed) return 'うしろに 置いた駒は この手番 うごかせないよ';
         return flankState(game).acted ? 'ふつうの1手は もう したよ。もちごまを 敵の大将の うしろに 置こう' : `${name}は いま うごけないよ`;
@@ -436,6 +451,11 @@ export function BattleScreen({ families, variant, cpu, battle, onFinish, onQuit 
     const tapped = pieceAt(game, pos);
     if (phaseType === 'spawn') {
       if (isTarget(pos)) dispatch({ type: 'spawn', to: pos });
+      return;
+    }
+    if (phaseType === 'sword' || (phaseType === 'gekokujo' && phase?.step === 1)) {
+      if (isTarget(pos)) dispatch(phaseType === 'sword' ? { type: 'strike', to: pos } : { type: 'uplift', at: pos });
+      else if (tapped) notice(whyCannotMove(tapped));
       return;
     }
     if (phaseType === 'naiou' || phaseType === 'cannon') {
@@ -546,6 +566,12 @@ export function BattleScreen({ families, variant, cpu, battle, onFinish, onQuit 
       case 'cannon':
         hint = '大筒で ねらう 駒を えらんでね (光っている駒)';
         break;
+      case 'sword':
+        hint = '大将の となりの 斬る 敵を えらんでね (光っている駒)';
+        break;
+      case 'gekokujo':
+        hint = step === 1 ? '出世させる 足軽を えらんでね (光っている足軽)' : '出世した 足軽を 1かい うごかそう';
+        break;
       case 'flank': {
         const fs = flankState(game);
         if (sel?.type === 'hand' && !fs.placed) hint = '敵の大将の 真後ろ (光るマス) に 置こう';
@@ -619,7 +645,15 @@ export function BattleScreen({ families, variant, cpu, battle, onFinish, onQuit 
           )}
           {target && piece && (
             <span className={`tag${phaseType === 'shoot' || phaseType === 'cannon' ? ' tag-shoot' : ''}`}>
-              {phaseType === 'shoot' || phaseType === 'cannon' ? 'うつ!' : phaseType === 'naiou' ? '寝返らせる' : 'とれる!'}
+              {phaseType === 'shoot' || phaseType === 'cannon'
+                ? 'うつ!'
+                : phaseType === 'naiou'
+                  ? '寝返らせる'
+                  : phaseType === 'sword'
+                    ? 'きる!'
+                    : phaseType === 'gekokujo' && phase?.step === 1
+                      ? '出世!'
+                      : 'とれる!'}
             </span>
           )}
         </button>,
