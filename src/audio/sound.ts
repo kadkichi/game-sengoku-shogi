@@ -2,7 +2,7 @@
  * 効果音。Web Audio で合成するので音声ファイルは不要。
  * 差し替えるときは play() の中身を audio 要素の再生に変えればよい。
  */
-export type SoundName = 'select' | 'move' | 'capture' | 'clash' | 'promote' | 'skill' | 'shoot' | 'danger' | 'win' | 'draw' | 'tap';
+export type SoundName = 'select' | 'move' | 'capture' | 'clash' | 'promote' | 'skill' | 'shoot' | 'danger' | 'win' | 'draw' | 'tap' | 'horagai';
 
 let ctx: AudioContext | null = null;
 let muted = false;
@@ -63,6 +63,57 @@ function noise(ac: AudioContext, start: number, dur: number, vol = 0.3) {
   src.start(start);
 }
 
+/**
+ * 法螺貝の「ブオォ〜」。低いのこぎり波をこもらせ、少し揺らしながら音程を上げ下げする。
+ * 1回目は短く、2回目を長く吹く
+ */
+function horagai(ac: AudioContext, start: number) {
+  const blow = (t0: number, dur: number, base: number) => {
+    const out = ac.createGain();
+    const filter = ac.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(500, t0);
+    filter.frequency.linearRampToValueAtTime(1300, t0 + dur * 0.35);
+    filter.frequency.linearRampToValueAtTime(700, t0 + dur);
+    filter.Q.value = 4;
+    out.gain.setValueAtTime(0.0001, t0);
+    out.gain.exponentialRampToValueAtTime(0.32, t0 + 0.18);
+    out.gain.setValueAtTime(0.32, t0 + dur * 0.7);
+    out.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    filter.connect(out).connect(ac.destination);
+    // ゆらぎ (ビブラート)
+    const lfo = ac.createOscillator();
+    const lfoGain = ac.createGain();
+    lfo.frequency.value = 5.5;
+    lfoGain.gain.value = base * 0.012;
+    lfo.connect(lfoGain);
+    for (const [mul, vol, type] of [
+      [1, 0.6, 'sawtooth'],
+      [2, 0.25, 'sawtooth'],
+      [3, 0.12, 'triangle'],
+    ] as [number, number, OscillatorType][]) {
+      const osc = ac.createOscillator();
+      const g = ac.createGain();
+      osc.type = type;
+      // 吹きはじめは低めから すくい上げ、終わりに少し下がる
+      osc.frequency.setValueAtTime(base * mul * 0.88, t0);
+      osc.frequency.exponentialRampToValueAtTime(base * mul, t0 + 0.22);
+      osc.frequency.setValueAtTime(base * mul, t0 + dur * 0.75);
+      osc.frequency.exponentialRampToValueAtTime(base * mul * 0.94, t0 + dur);
+      lfoGain.connect(osc.frequency);
+      g.gain.value = vol;
+      osc.connect(g).connect(filter);
+      osc.start(t0);
+      osc.stop(t0 + dur + 0.05);
+    }
+    lfo.start(t0);
+    lfo.stop(t0 + dur + 0.05);
+    noise(ac, t0, 0.15, 0.05);
+  };
+  blow(start, 0.7, 116);
+  blow(start + 0.85, 1.7, 116);
+}
+
 export function play(name: SoundName) {
   if (muted) return;
   const ac = audio();
@@ -111,6 +162,9 @@ export function play(name: SoundName) {
       [523, 659, 784].forEach((f, i) => tone(ac, f, t + i * 0.14, 0.2, 'triangle', 0.18));
       [523, 659, 784, 1047].forEach((f) => tone(ac, f, t + 0.5, 0.9, 'triangle', 0.1));
       thump(ac, t + 0.5, 110, 0.4, 0.6);
+      break;
+    case 'horagai':
+      horagai(ac, t);
       break;
     case 'draw':
       tone(ac, 392, t, 0.3, 'triangle', 0.15);

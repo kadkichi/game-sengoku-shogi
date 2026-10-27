@@ -220,8 +220,9 @@ export function legalMoves(state: GameState, from: Pos): Pos[] {
     switch (phase.type) {
       case 'double':
         if (piece.kind === 'K') return [];
+        // 2かいめで 駒を とっても いい。ただし 大将は とれない
         moves = pseudoMoves(state, from);
-        if (phase.step >= 2) moves = moves.filter((to) => !pieceAt(state, to));
+        if (phase.step >= 2) moves = moves.filter((to) => pieceAt(state, to)?.kind !== 'K');
         break;
       case 'kingDouble':
         if (piece.kind !== 'K') return [];
@@ -272,7 +273,7 @@ function emptySquares(state: GameState): Pos[] {
   return out;
 }
 
-/** 鉄砲三段撃ち / 東海一の弓取: この足軽が撃てるマス (前に1〜2マス。途中に駒があればそこで止まる。大将は撃てない) */
+/** 鉄砲三段撃ち / 東海一の弓取: この足軽が撃てるマス (前に1〜2マス。途中に駒があればそこで止まる。大将も撃てる) */
 export function shootTargets(state: GameState, from: Pos): Pos[] {
   const piece = pieceAt(state, from);
   if (!piece || piece.owner !== state.turn || piece.kind !== 'P') return [];
@@ -282,7 +283,7 @@ export function shootTargets(state: GameState, from: Pos): Pos[] {
     if (!inBounds(state, to)) return [];
     const target = pieceAt(state, to);
     if (!target) continue;
-    if (target.owner === piece.owner || target.kind === 'K' || isShielded(state, to)) return [];
+    if (target.owner === piece.owner || isShielded(state, to)) return [];
     if (isForbidden(state, { type: 'shoot', from, to })) return [];
     return [to];
   }
@@ -444,6 +445,12 @@ export function applyAction(prev: GameState, action: Action): GameState {
       if (!shootTargets(state, action.from).some((p) => samePos(p, action.to))) fail('illegal shot');
       commit();
       capture(state, action.to, 'shoot');
+      // 大将を撃ったら、その場で勝ち
+      if (state.winner) {
+        state.skillPhase = null;
+        state.moveCount++;
+        return state;
+      }
       endTurn(state);
       return state;
     }

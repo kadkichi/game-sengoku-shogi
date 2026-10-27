@@ -54,7 +54,7 @@ describe('指せる手番の一覧', () => {
 });
 
 describe('CPU', () => {
-  for (const level of ['weak', 'normal'] as CpuLevel[]) {
+  for (const level of ['weak', 'normal', 'strong'] as CpuLevel[]) {
     it(`${level}: 大将を取れるときは必ず取る`, () => {
       const s = custom(
         [
@@ -69,7 +69,7 @@ describe('CPU', () => {
     });
   }
 
-  it('normal: 取られる場所に大将を置いたままにしない', () => {
+  for (const level of ['normal', 'strong'] as CpuLevel[]) it(`${level}: 取られる場所に大将を置いたままにしない`, () => {
     // 先手の大将が金に狙われている。normal は逃げるか金を取る
     const s = custom(
       [
@@ -81,7 +81,7 @@ describe('CPU', () => {
       { sente: 'oda', gote: 'takeda' },
     );
     for (let i = 0; i < 5; i++) {
-      const { after } = play(s, 'normal', seeded(i));
+      const { after } = play(s, level, seeded(i));
       const replies = listTurns(after);
       expect(replies.some((r) => r.result.winner === 'gote')).toBe(false);
     }
@@ -102,7 +102,7 @@ describe('CPU', () => {
     expect(missed).toBeGreaterThan(5);
   });
 
-  it('normal: タダで取れる駒は取る', () => {
+  for (const level of ['normal', 'strong'] as CpuLevel[]) it(`${level}: タダで取れる駒は取る`, () => {
     const s = custom(
       [
         [P(2, 3), piece('sente', 'G')],
@@ -112,7 +112,7 @@ describe('CPU', () => {
       ],
       { sente: 'oda', gote: 'takeda' },
     );
-    const { after } = play(s, 'normal');
+    const { after } = play(s, level);
     expect(after.hands.sente.length).toBe(1);
   });
 
@@ -145,11 +145,11 @@ describe('CPU', () => {
     expect(after.hands.sente.some((p) => p.kind === 'G')).toBe(true);
   });
 
-  it('全12家・両モード・両方の強さで、初期局面から反則なく指せて、十分に速い', () => {
+  it('全12家・両モード・3つの強さで、初期局面から反則なく指せて、十分に速い', () => {
     let slowest = 0;
     for (const variant of ['small', 'large'] as Variant[]) {
       for (const fam of FAMILY_IDS) {
-        for (const level of ['weak', 'normal'] as CpuLevel[]) {
+        for (const level of ['weak', 'normal', 'strong'] as CpuLevel[]) {
           // 数手進めて、必殺技を使える局面も含める
           let s = createGame({ sente: fam, gote: FAMILY_IDS[(FAMILY_IDS.indexOf(fam) + 5) % 12] }, variant);
           for (let ply = 0; ply < 4 && !s.winner && !s.draw; ply++) {

@@ -1,3 +1,4 @@
+import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FAMILIES, type FamilyId } from '../data/families';
 import {
@@ -5,6 +6,7 @@ import {
   canActivateSkill,
   createGame,
   directions,
+  findKing,
   isKingInDanger,
   isTrying,
   legalDrops,
@@ -24,6 +26,7 @@ import { isMuted, play, setMuted, type SoundName } from '../audio/sound';
 import { Chara, specialOf } from './Chara';
 import { DirDots, PieceTile, type Motion } from './PieceTile';
 import { Clash } from './Clash';
+import { RulesDialog } from './RulesDialog';
 import { tileColors } from './sideColors';
 import { useStage } from './Stage';
 import { think } from '../ai/think';
@@ -69,6 +72,7 @@ interface Ghost {
 }
 
 let seq = 0;
+const TRY_COLORS = ['#ffe38a', '#ffffff', '#ff8a5c', '#7fd3ff', '#b6f08a'];
 
 /** CPU の操作と操作のあいだの間 (ms) */
 /** CPU が「かんがえ中…」を見せる最短の時間。あなたの手のアニメーションが終わってから数える */
@@ -94,8 +98,11 @@ export function BattleScreen({ families, variant, cpu, onFinish, onQuit }: Props
   /** 戦闘のアニメーション中は、次の操作を受け付けない */
   const busyUntil = useRef(0);
   const [justPromoted, setJustPromoted] = useState<string | null>(null);
+  /** トライの演出。exit=大将が盤の外の本陣へ進む / title=「トライ!」の文字 */
+  const [tryRun, setTryRun] = useState<{ side: Side; at: Pos; piece: Piece; family: FamilyId; stage: 'exit' | 'title' } | null>(null);
   const [muted, setMutedState] = useState(isMuted());
   const [confirmQuit, setConfirmQuit] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
 
   const { scale, ref: stageRef, compact } = useStage();
   const cellRefs = useRef(new Map<string, HTMLElement>());
@@ -275,18 +282,36 @@ export function BattleScreen({ families, variant, cpu, onFinish, onQuit }: Props
           if (sound !== 'shoot') sound = 'promote';
           break;
         case 'shield':
-          say('小田原城!', `つぎの あいての番、${army}の駒は とられない`);
+          say('小田原城総構え!', `つぎの あいての番、${army}の駒は とられない`);
           break;
         case 'undo':
           say('まった!', `${FAMILIES[game.families[opponent(side)]].army}の さっきの手を なかったことにした`);
           break;
-        case 'win':
-          if (ev.reason === 'try') say('トライ!', `${FAMILIES[game.families[ev.side]].lord}が 本陣に のりこんだ!`);
-          break;
       }
     }
     if (sound) play(sound);
-    if (next.winner || next.draw) {
+    // 大将が相手の一番奥の段に入った (次の相手の番で取られなければトライ)
+    if (!next.winner && captures.length === 0 && isTrying(next, side) && !isTrying(game, side)) {
+      say('トライまで あと すこし!', `${FAMILIES[game.families[side]].lord}が 本陣の 前に 入った`);
+    }
+    const tryWin = next.events.find((e) => e.type === 'win' && e.reason === 'try');
+    const tryAt = tryWin?.type === 'win' ? findKing(next, tryWin.side) : null;
+    if (tryWin?.type === 'win' && tryAt) {
+      // トライ: 相手の手のアニメーションのあと、大将が盤の外の本陣へ進み、「トライ!」を見せてから結果へ
+      const trySide = tryWin.side;
+      const start = busy + 200;
+      const piece = next.board[tryAt.y][tryAt.x] as Piece;
+      later(start, () => {
+        setTryRun({ side: trySide, at: tryAt, piece, family: next.families[trySide], stage: 'exit' });
+        play('horagai');
+      });
+      later(start + 1400, () => {
+        setTryRun((cur) => cur && { ...cur, stage: 'title' });
+        play('win');
+      });
+      later(start + 3400, () => onFinish({ winner: next.winner, winReason: next.winReason, families, variant, moveCount: next.moveCount }));
+      busy = start + 3400;
+    } else if (next.winner || next.draw) {
       setTimeout(() => play(next.winner ? 'win' : 'draw'), 400);
       setTimeout(() => onFinish({ winner: next.winner, winReason: next.winReason, families, variant, moveCount: next.moveCount }), 1800);
     }
@@ -490,6 +515,8 @@ export function BattleScreen({ families, variant, cpu, onFinish, onQuit }: Props
   if (sel && !phase && !over) hintButtons.push({ label: 'えらびなおす', onClick: () => setSel(null) });
 
   // ---- 描画 ----
+  /** 大将が入っていて、トライまであと少しの段 (黄色く光らせる) */
+  const tryRows = (['sente', 'gote'] as Side[]).filter((s) => isTrying(game, s)).map((s) => (s === 'sente' ? 0 : rows - 1));
   const cells = [];
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
@@ -498,6 +525,7 @@ export function BattleScreen({ families, variant, cpu, onFinish, onQuit }: Props
       const target = isTarget(pos);
       const selected = sel?.type === 'board' && samePos(sel.pos, pos);
       const isSource = !selected && sources.some((p) => samePos(p, pos));
+      const hidden = !!piece && tryRun?.piece.id === piece.id;
       const label = `${cols - x}の${rows - y}${piece ? ` ${FAMILIES[game.families[piece.owner]].army}の${piece.name}` : ''}${target ? ' (ここに うごける)' : ''}`;
       cells.push(
         <button
@@ -505,12 +533,12 @@ export function BattleScreen({ families, variant, cpu, onFinish, onQuit }: Props
           ref={(el) => {
             if (el) cellRefs.current.set(`${x},${y}`, el);
           }}
-          className={`cell${x < cols - 1 ? ' line-r' : ''}${y < rows - 1 ? ' line-b' : ''}${variant === 'small' && (y === 0 || y === rows - 1) ? ' zone' : ''}`}
+          className={`cell${x < cols - 1 ? ' line-r' : ''}${y < rows - 1 ? ' line-b' : ''}${variant === 'small' && (y === 0 || y === rows - 1) ? ' zone' : ''}${tryRows.includes(y) ? ' try-row' : ''}`}
           aria-label={label}
           onClick={() => onCell(pos)}
         >
           {target && !piece && <span className="move-dot" style={{ left: cell / 2 - 18, top: cell / 2 - 18 }} />}
-          {piece && (
+          {piece && !hidden && (
             <PieceTile
               piece={piece}
               family={game.families[piece.owner]}
@@ -550,7 +578,7 @@ export function BattleScreen({ families, variant, cpu, onFinish, onQuit }: Props
   return (
     <div className="screen screen-paper">
       <div style={{ height: compact ? 52 : 64, flex: '0 0 auto', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff', borderBottom: '2px solid var(--line)' }}>
-        <span className="display" style={{ fontSize: compact ? 22 : 26, width: 260 }}>
+        <span className="display" style={{ fontSize: compact ? 22 : 26, width: compact ? 200 : 380 }}>
           戦国将棋
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }} aria-live="polite">
@@ -573,7 +601,10 @@ export function BattleScreen({ families, variant, cpu, onFinish, onQuit }: Props
             {!over && game.turn === 'sente' && <span aria-hidden="true">▶</span>}
           </span>
         </div>
-        <div style={{ display: 'flex', gap: 10, width: 260, justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: compact ? 8 : 10, width: compact ? 340 : 380, justifyContent: 'flex-end' }}>
+          <button className="btn btn-ghost" onClick={() => setRulesOpen(true)}>
+            あそびかた
+          </button>
           <button
             className="btn btn-ghost"
             aria-pressed={!muted}
@@ -624,6 +655,30 @@ export function BattleScreen({ families, variant, cpu, onFinish, onQuit }: Props
               {clashes.map((c) => (
                 <Clash key={c.key} x={c.x} y={c.y} kind={c.kind} scale={cell / 96} />
               ))}
+              {tryRun?.stage === 'exit' && (
+                <div
+                  className="try-exit"
+                  style={{ left: tryRun.at.x * cell, top: tryRun.at.y * cell, width: cell, height: cell, '--ty': `${(tryRun.side === 'sente' ? -1 : 1) * cell * 1.8}px` } as React.CSSProperties}
+                >
+                  <PieceTile piece={tryRun.piece} family={tryRun.family} variant={variant} cell={cell} />
+                </div>
+              )}
+              {tryRun?.stage === 'title' && (
+                <div className="try-title" style={{ background: `${FAMILIES[tryRun.family].colors.border}e6` }}>
+                  {Array.from({ length: 18 }, (_, i) => (
+                    <span
+                      key={i}
+                      aria-hidden="true"
+                      className="confetti"
+                      style={{ left: `${(i * 37) % 100}%`, top: -30, width: i % 2 ? 10 : 16, height: i % 2 ? 16 : 9, background: TRY_COLORS[i % TRY_COLORS.length], animationDelay: `${-(i % 6) * 0.45}s`, animationDuration: '2.4s' }}
+                    />
+                  ))}
+                  <span className="display try-word" style={{ fontSize: compact ? 64 : 84 }}>
+                    トライ!
+                  </span>
+                  <span style={{ fontSize: compact ? 18 : 22, fontWeight: 800 }}>{FAMILIES[tryRun.family].lord}が 本陣に のりこんだ!</span>
+                </div>
+              )}
             </div>
           </div>
           <div style={{ height: compact ? 40 : 44, display: 'flex', alignItems: 'center', gap: 12, fontSize: compact ? 17 : 16, fontWeight: 700, textAlign: 'center' }}>
@@ -651,6 +706,7 @@ export function BattleScreen({ families, variant, cpu, onFinish, onQuit }: Props
           </div>
         </div>
       )}
+      {rulesOpen && <RulesDialog variant={variant} onClose={() => setRulesOpen(false)} />}
       {ghost && <FlyingPiece key={ghost.key} ghost={ghost} onDone={clearGhost} />}
     </div>
   );
@@ -751,7 +807,7 @@ function SidePanel({ side, compact, cpuLabel, thinking, game, selectedHandId, ha
   const skill = (
     <div
       className="card"
-      title={fam.skill.short}
+      title={fam.skill.desc}
       style={{ padding: compact ? '10px 14px' : '14px 16px', display: 'flex', flexDirection: 'column', gap: compact ? 4 : 6, borderColor: skillEnabled ? '#f5c542' : undefined, borderWidth: skillEnabled ? 3 : 2 }}
     >
       <span className="label-gold" style={compact ? { fontSize: 14 } : undefined}>
@@ -761,7 +817,7 @@ function SidePanel({ side, compact, cpuLabel, thinking, game, selectedHandId, ha
       {/* スマホでは説明を省く (技を使うと、盤の下の案内で何をするか出る) */}
       {!compact && (
         <span style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.5, color: '#4a3b2c' }}>
-          {fam.skill.short}
+          {fam.skill.desc}
           {game.variant === 'small' && fam.skill.smallNote ? ` ※${fam.skill.smallNote}` : ''}
         </span>
       )}

@@ -2,7 +2,7 @@ import { isKingInDanger, opponent } from '../engine/game';
 import { listTurns, type Turn } from '../engine/turns';
 import type { Action, GameState, Kind, Piece, Side } from '../engine/types';
 
-export type CpuLevel = 'weak' | 'normal';
+export type CpuLevel = 'weak' | 'normal' | 'strong';
 
 /** CPU と対戦するときの設定。CPU が指す側と強さ */
 export interface CpuSetting {
@@ -10,7 +10,7 @@ export interface CpuSetting {
   level: CpuLevel;
 }
 
-export const LEVEL_LABEL: Record<CpuLevel, string> = { weak: 'よわい', normal: 'ふつう' };
+export const LEVEL_LABEL: Record<CpuLevel, string> = { weak: 'よわい', normal: 'ふつう', strong: 'つよい' };
 
 const WIN = 1_000_000;
 
@@ -88,6 +88,7 @@ function searchRoot(state: GameState): GameState {
  * CPU の手を選ぶ。返り値は、その手番に行う操作の並び。
  * - weak:   半分くらいは適当に指す。残りも1手だけ読み、大将が狙われていても気にしない (取れる大将は取る)
  * - normal: 自分の手と相手の返しの2手を読む
+ * - strong: 自分・相手・自分の3手を読む。時間がかかりすぎたら2手読みの答えを使う
  */
 export function chooseTurn(state: GameState, level: CpuLevel, rng: () => number = Math.random): Action[] {
   const side = state.turn;
@@ -118,6 +119,8 @@ export function chooseTurn(state: GameState, level: CpuLevel, rng: () => number 
     return best.actions;
   }
 
+  if (level === 'strong') return strongTurn(turns, side, rng);
+
   // normal: 2手読み (アルファベータ法で、相手の返しの読みを途中で打ち切る)
   let best: Turn = turns[0];
   let alpha = -Infinity;
@@ -141,4 +144,59 @@ export function chooseTurn(state: GameState, level: CpuLevel, rng: () => number 
     }
   }
   return best.actions;
+}
+
+/** つよい CPU が1手に使う時間の上限 (ミリ秒)。こえたら読みを打ち切る */
+const STRONG_TIME_LIMIT = 1500;
+
+class TimeUp extends Error {}
+
+/**
+ * state から depth 手先まで読んだときの点数 (side から見て)。アルファベータ法。
+ * 必殺技で手番が続くこともあるので、「次に指すのがどちらか」で大きい方・小さい方を選ぶ
+ */
+function search(state: GameState, depth: number, alpha: number, beta: number, side: Side, deadline: number): number {
+  if (depth === 0 || state.winner !== null || state.draw) return evaluate(state, side);
+  if (Date.now() > deadline) throw new TimeUp();
+  const turns = listTurns(state);
+  if (turns.length === 0) return evaluate(state, side);
+  const mine = state.turn === side;
+  let best = mine ? -Infinity : Infinity;
+  for (const t of order(turns, state.turn)) {
+    const v = search(t.result, depth - 1, alpha, beta, side, deadline);
+    if (mine) {
+      best = Math.max(best, v);
+      alpha = Math.max(alpha, best);
+    } else {
+      best = Math.min(best, v);
+      beta = Math.min(beta, best);
+    }
+    if (alpha >= beta) break;
+  }
+  return best;
+}
+
+/** 2手読み、3手読みの順に読み、時間内に読み終えたいちばん深い答えを使う */
+function strongTurn(turns: Turn[], side: Side, rng: () => number): Action[] {
+  const deadline = Date.now() + STRONG_TIME_LIMIT;
+  const ordered = order(turns, side);
+  let answer: Turn = ordered[0];
+  for (const depth of [2, 3]) {
+    try {
+      let best: Turn = ordered[0];
+      let alpha = -Infinity;
+      for (const t of ordered) {
+        const v = search(t.result, depth - 1, alpha, Infinity, side, deadline) + noise(rng, 0.1);
+        if (v > alpha) {
+          alpha = v;
+          best = t;
+        }
+      }
+      answer = best;
+    } catch (e) {
+      if (e instanceof TimeUp) break;
+      throw e;
+    }
+  }
+  return answer.actions;
 }

@@ -228,7 +228,7 @@ export function SelectScreen({ initial, initialVariant, initialCpu, solo, onBack
                     {compact ? f.skill.name : `ひっさつわざ「${f.skill.name}」`}
                   </span>
                   <span style={{ fontSize: compact ? 14 : 13, fontWeight: 700, lineHeight: 1.45, color: '#4a3b2c' }}>
-                    {f.skill.short}
+                    {f.skill.desc}
                     {variant === 'small' && f.skill.smallNote ? ` ※${f.skill.smallNote}` : ''}
                   </span>
                 </span>
@@ -297,7 +297,7 @@ export function SelectScreen({ initial, initialVariant, initialCpu, solo, onBack
                 setAskLevel(true);
                 return;
               }
-              play('skill');
+              play('horagai');
               onStart(picked, variant, null);
             }}
           >
@@ -309,7 +309,7 @@ export function SelectScreen({ initial, initialVariant, initialCpu, solo, onBack
         <LevelPicker
           onCancel={() => setAskLevel(false)}
           onPick={(level) => {
-            play('skill');
+            play('horagai');
             onStart(picked, variant, { side: other(humanSide), level });
           }}
         />
@@ -320,7 +320,8 @@ export function SelectScreen({ initial, initialVariant, initialCpu, solo, onBack
 
 const LEVELS: { level: CpuLevel; sub: string; color: string; shadow: string }[] = [
   { level: 'weak', sub: 'はじめての人に おすすめ', color: '#3f9b4a', shadow: '#2c6f34' },
-  { level: 'normal', sub: 'すこし 先を よんで さしてくる', color: '#d0392e', shadow: '#9e2a22' },
+  { level: 'normal', sub: 'すこし 先を よんで さしてくる', color: '#e07b1a', shadow: '#a85a10' },
+  { level: 'strong', sub: 'もっと 先まで よんで さしてくる', color: '#d0392e', shadow: '#9e2a22' },
 ];
 
 /** 「かいせん!」のあとに、CPU の強さを選ぶ窓 */
@@ -333,12 +334,12 @@ function LevelPicker({ onPick, onCancel }: { onPick: (level: CpuLevel) => void; 
         aria-modal="true"
         aria-label="CPUの つよさを えらぶ"
         onClick={(e) => e.stopPropagation()}
-        style={{ flexDirection: 'column', gap: 22, padding: '28px 40px 32px', borderColor: '#6b3fa0', width: 640 }}
+        style={{ flexDirection: 'column', gap: 22, padding: '28px 40px 32px', borderColor: '#6b3fa0', width: 860 }}
       >
         <h2 className="display" style={{ margin: 0, fontSize: 34, fontWeight: 400 }}>
           CPUの つよさを えらんでね
         </h2>
-        <div style={{ display: 'flex', gap: 24 }}>
+        <div style={{ display: 'flex', gap: 20 }}>
           {LEVELS.map((l) => (
             <button
               key={l.level}
@@ -346,7 +347,7 @@ function LevelPicker({ onPick, onCancel }: { onPick: (level: CpuLevel) => void; 
               autoFocus={l.level === 'weak'}
               onClick={() => onPick(l.level)}
               style={{
-                width: 260, height: 120, borderRadius: 28, flexDirection: 'column', gap: 6, color: '#fff',
+                width: 248, height: 120, borderRadius: 28, flexDirection: 'column', gap: 6, color: '#fff',
                 background: l.color, boxShadow: `0 6px 0 ${l.shadow}`,
               }}
             >

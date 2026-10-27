@@ -78,7 +78,7 @@ export const FAMILIES: Record<FamilyId, Family> = {
     skill: {
       type: 'shoot', name: '鉄砲三段撃ち', phrase: '撃て!',
       short: '足軽の まっすぐ前 2マスまでの てきを 1まい とる',
-      desc: '足軽の まっすぐ前 2マスまでにいる てきの駒を 1まい とる (大将は とれない)',
+      desc: '足軽の まっすぐ前 2マスまでにいる てきの駒を 1まい とる (大将も とれる。大将を とったら かち)',
     },
     colors: { main: '#2E2A2A', border: '#2B2B2B', tile: '#FFECE8', helm: '#2E2A2A', trim: '#D9302C', monFill: GOLD },
   },
@@ -88,7 +88,7 @@ export const FAMILIES: Record<FamilyId, Family> = {
     skill: {
       type: 'double', name: '風林火山', phrase: '疾きこと風の如し!',
       short: '大将いがいの駒を 2かい つづけて うごかせる',
-      desc: '大将いがいの駒を 2かい つづけて うごかせる (2かいめは 駒を とれない)',
+      desc: '大将いがいの駒を 2かい つづけて うごかせる (2かいめで 駒を とっても いい。ただし 大将は とれない)',
     },
     colors: { main: '#D9302C', border: '#C42F2F', tile: '#FFF4D1', helm: '#D9302C', trim: GOLD, monFill: GOLD },
   },
@@ -137,7 +137,7 @@ export const FAMILIES: Record<FamilyId, Family> = {
     id: 'hojo', name: '北条家', army: '北条軍', lord: '北条氏康',
     gold: ['北条綱成', '北条氏照'], silver: ['北条幻庵', '風魔小太郎'],
     skill: {
-      type: 'shield', name: '小田原城', phrase: '城の守りは かたいぞ!',
+      type: 'shield', name: '小田原城総構え', phrase: '城の守りは かたいぞ!',
       short: 'つぎの あいての番、自分の駒は とられない',
       desc: 'つぎの あいての番、自分の駒は どれも とられない (この技では 手番を使わない。そのあと ふつうに 指す)',
     },
@@ -149,7 +149,7 @@ export const FAMILIES: Record<FamilyId, Family> = {
     skill: {
       type: 'shoot', name: '東海一の弓取', phrase: '射よ!',
       short: '足軽の まっすぐ前 2マスまでの てきを 1まい とる',
-      desc: '足軽の まっすぐ前 2マスまでにいる てきの駒を 1まい とる (大将は とれない)',
+      desc: '足軽の まっすぐ前 2マスまでにいる てきの駒を 1まい とる (大将も とれる。大将を とったら かち)',
     },
     colors: { main: '#A3324F', border: '#8E2742', tile: '#FBE6EF', helm: '#A3324F', trim: GOLD, monFill: GOLD },
   },

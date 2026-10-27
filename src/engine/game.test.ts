@@ -244,11 +244,19 @@ describe('織田家 鉄砲三段撃ち', () => {
       { families: { sente: 'oda', gote: 'uesugi' } },
     );
 
-  it('前2マスまでの敵を撃てる。大将は撃てない', () => {
+  it('前2マスまでの敵を撃てる。大将も撃てる', () => {
     const s = setup();
     expect(shootTargets(s, P(1, 3))).toEqual([P(1, 1)]);
-    expect(shootTargets(s, P(3, 3))).toEqual([]);
-    expect(shooters(s)).toEqual([P(1, 3)]);
+    expect(shootTargets(s, P(3, 3))).toEqual([P(3, 2)]);
+    expect(shooters(s)).toEqual([P(1, 3), P(3, 3)]);
+  });
+
+  it('大将を撃てば、その場で勝ち', () => {
+    let s = applyAction(setup(), { type: 'activateSkill' });
+    s = applyAction(s, { type: 'shoot', from: P(3, 3), to: P(3, 2) });
+    expect(s.winner).toBe('sente');
+    expect(s.winReason).toBe('capture');
+    expect(s.skillPhase).toBeNull();
   });
 
   it('途中に駒があるとその先は撃てない', () => {
@@ -292,17 +300,32 @@ describe('武田家 風林火山', () => {
       { families: { sente: 'takeda', gote: 'oda' } },
     );
 
-  it('大将以外の駒を2回動かせる。2回目は駒を取れない', () => {
+  it('大将以外の駒を2回動かせる。2回目でも駒を取れる', () => {
     let s = applyAction(setup(), { type: 'activateSkill' });
     expect(legalMoves(s, P(2, 5))).toEqual([]);
     s = applyAction(s, { type: 'move', from: P(1, 3), to: P(1, 2) });
     expect(s.turn).toBe('sente');
     expect(s.skillPhase).toMatchObject({ type: 'double', step: 2 });
-    expect(legalMoves(s, P(1, 2)).some((p) => p.x === 1 && p.y === 1)).toBe(false);
-    s = applyAction(s, { type: 'move', from: P(1, 2), to: P(0, 1) });
+    expect(legalMoves(s, P(1, 2)).some((p) => p.x === 1 && p.y === 1)).toBe(true);
+    s = applyAction(s, { type: 'move', from: P(1, 2), to: P(1, 1) });
+    expect(s.hands.sente).toHaveLength(1);
     expect(s.turn).toBe('gote');
     expect(s.moveCount).toBe(1);
     expect(s.skillUsed.sente).toBe(true);
+  });
+
+  it('2回目では大将は取れない', () => {
+    let s = custom(
+      [
+        [P(2, 3), piece('sente', 'G')],
+        [P(2, 1), piece('gote', 'K')],
+        [P(0, 5), piece('sente', 'K')],
+      ],
+      { families: { sente: 'takeda', gote: 'oda' } },
+    );
+    s = applyAction(s, { type: 'activateSkill' });
+    s = applyAction(s, { type: 'move', from: P(2, 3), to: P(2, 2) });
+    expect(legalMoves(s, P(2, 2)).some((p) => p.x === 2 && p.y === 1)).toBe(false);
   });
 
   it('1回目では駒を取れる', () => {

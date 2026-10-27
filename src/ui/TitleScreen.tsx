@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import type { FamilyId } from '../data/families';
 import { play } from '../audio/sound';
 import { FamilyInfo } from './FamilyInfo';
+import { RulesDialog } from './RulesDialog';
 import { LordCarousel } from './LordCarousel';
 import { Scenery } from './Scenery';
 import { useStage } from './Stage';
@@ -12,6 +13,7 @@ export function TitleScreen({ onStart }: { onStart: (mode: PlayMode) => void }) 
   const { compact } = useStage();
   const [info, setInfo] = useState<FamilyId | null>(null);
   const closeInfo = useCallback(() => setInfo(null), []);
+  const [rules, setRules] = useState(false);
   return (
     <div className="screen screen-sky">
       <Scenery />
@@ -55,7 +57,18 @@ export function TitleScreen({ onStart }: { onStart: (mode: PlayMode) => void }) 
       {!compact && (
         <div style={{ position: 'absolute', right: 40, bottom: 20, fontSize: 15, fontWeight: 700, color: '#1f3d1a' }}>大将を おすと 家紋と 武将が みられるよ</div>
       )}
+      <button
+        className="btn btn-ghost"
+        style={{ position: 'absolute', top: compact ? 14 : 24, right: compact ? 20 : 32, background: '#fff', fontSize: 18, height: 48, padding: '0 22px', borderRadius: 24 }}
+        onClick={() => {
+          play('tap');
+          setRules(true);
+        }}
+      >
+        あそびかた
+      </button>
       {info && <FamilyInfo family={info} onClose={closeInfo} />}
+      {rules && <RulesDialog onClose={() => setRules(false)} />}
     </div>
   );
 }
