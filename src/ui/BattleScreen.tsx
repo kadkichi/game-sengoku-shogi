@@ -5,6 +5,8 @@ import {
   applyAction,
   canActivateSkill,
   cannonTargets,
+  flankState,
+  flankTargets,
   isProtected,
   turncoatTargets,
   createGame,
@@ -49,7 +51,7 @@ export interface BattleResult {
 const CELL: Record<Variant, number> = { small: 132, large: 96 };
 
 /** 駒を選んで動かす型の必殺技 */
-const MOVE_SKILLS = new Set(['double', 'kingDouble', 'arrows', 'slideDiag', 'charge']);
+const MOVE_SKILLS = new Set(['double', 'kingDouble', 'arrows', 'slideDiag', 'charge', 'flank']);
 
 interface Props {
   families: Record<Side, FamilyId>;
@@ -146,7 +148,8 @@ export function BattleScreen({ families, variant, cpu, battle, onFinish, onQuit 
     if (phaseType === 'naiou') return turncoatTargets(game);
     if (phaseType === 'cannon') return cannonTargets(game);
     if (!sel) return [];
-    if (sel.type === 'hand') return legalDrops(game, sel.pieceId);
+    // 挟み撃ち: まだ置いていなければ、持ち駒は 敵の大将の真後ろに置く。置いたあとは ふつうに打てる
+    if (sel.type === 'hand') return phaseType === 'flank' && !flankState(game).placed ? flankTargets(game, sel.pieceId) : legalDrops(game, sel.pieceId);
     if (phaseType === 'shoot') return shootTargets(game, sel.pos);
     if (phaseType === 'pull' && phase?.step === 1) return pullTargets(game, sel.pos);
     return legalMoves(game, sel.pos);
@@ -311,6 +314,7 @@ export function BattleScreen({ families, variant, cpu, battle, onFinish, onQuit 
           break;
       }
     }
+    if (action.type === 'flank') say('挟み撃ち!', '敵の大将の うしろに 回りこんだ');
     if (sound) play(sound);
     // 大将が相手の一番奥の段に入った (次の相手の番で取られなければトライ)
     if (!next.winner && captures.length === 0 && isTrying(next, side) && !isTrying(game, side)) {
@@ -419,6 +423,9 @@ export function BattleScreen({ families, variant, cpu, battle, onFinish, onQuit 
         return '寝返らせられるのは 光っている 武将だけだよ';
       case 'cannon':
         return '大筒で ねらえるのは 光っている 駒だけだよ';
+      case 'flank':
+        if (piece.id === flankState(game).placed) return 'うしろに 置いた駒は この手番 うごかせないよ';
+        return flankState(game).acted ? 'ふつうの1手は もう したよ。もちごまを 敵の大将の うしろに 置こう' : `${name}は いま うごけないよ`;
       default:
         return game.forbidden ? `${name}は いま うごけないよ (さっきと おなじ手は 指せない)` : `${name}は いま うごけないよ`;
     }
@@ -453,7 +460,9 @@ export function BattleScreen({ families, variant, cpu, battle, onFinish, onQuit 
     if (sel && isTarget(pos)) {
       return sel.type === 'board'
         ? dispatch({ type: 'move', from: sel.pos, to: pos })
-        : dispatch({ type: 'drop', pieceId: sel.pieceId, to: pos });
+        : phaseType === 'flank' && !flank.placed
+          ? dispatch({ type: 'flank', pieceId: sel.pieceId, to: pos })
+          : dispatch({ type: 'drop', pieceId: sel.pieceId, to: pos });
     }
     if (tapped && tapped.owner === game.turn && legalMoves(game, pos).length > 0) {
       if (sel?.type === 'board' && samePos(sel.pos, pos)) return setSel(null);
@@ -465,7 +474,9 @@ export function BattleScreen({ families, variant, cpu, battle, onFinish, onQuit 
     if (tapped && !sel) notice(whyCannotMove(tapped));
   };
 
-  const handEnabled = (side: Side) => !over && !isCpuSide(side) && side === game.turn && (!phase || phaseType === 'drop2');
+  const flank = flankState(game);
+  const handEnabled = (side: Side) =>
+    !over && !isCpuSide(side) && side === game.turn && (!phase || phaseType === 'drop2' || (phaseType === 'flank' && !(flank.placed && flank.acted)));
   const onHand = (side: Side, pieceId: string) => {
     if (!handEnabled(side)) return;
     if (sel?.type === 'hand' && sel.pieceId === pieceId) return setSel(null);
@@ -535,6 +546,14 @@ export function BattleScreen({ families, variant, cpu, battle, onFinish, onQuit 
       case 'cannon':
         hint = '大筒で ねらう 駒を えらんでね (光っている駒)';
         break;
+      case 'flank': {
+        const fs = flankState(game);
+        if (sel?.type === 'hand' && !fs.placed) hint = '敵の大将の 真後ろ (光るマス) に 置こう';
+        else if (!fs.placed && !fs.acted) hint = 'もちごまを 敵の大将の 真後ろに 置いて、ふつうの1手も しよう';
+        else if (!fs.placed) hint = 'もちごまを えらんで、敵の大将の 真後ろに 置こう';
+        else hint = 'ふつうの1手を しよう (置いた駒は うごかせない)';
+        break;
+      }
     }
     if (step === 1) hintButtons.push(cancel);
 

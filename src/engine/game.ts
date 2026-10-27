@@ -93,6 +93,32 @@ const isFortUnit = (state: GameState, piece: Piece, side: Side): boolean => {
   return skill.type === 'fort' && piece.owner === side && piece.name === skill.unit && piece.originFamily === state.families[side];
 };
 
+/** 挟み撃ち: 置いた駒の id (まだ置いていなければ null) と、ふつうの1手をもうしたか */
+export const flankState = (state: GameState): { placed: string | null; acted: boolean } => {
+  const moved = state.skillPhase?.type === 'flank' ? state.skillPhase.moved : [];
+  const p = moved.find((m) => m.startsWith('placed:'));
+  return { placed: p ? p.slice('placed:'.length) : null, acted: moved.includes('acted') };
+};
+
+/** 挟み撃ち: 敵の大将の 真後ろのマス (盤の中で、空いているとき) */
+export function flankSquare(state: GameState): Pos | null {
+  const enemy = opponent(state.turn);
+  const king = findKing(state, enemy);
+  if (!king) return null;
+  const to = { x: king.x, y: king.y - forward(enemy) };
+  return inBounds(state, to) && !pieceAt(state, to) ? to : null;
+}
+
+/** 挟み撃ち: この持ち駒を置けるマス (足軽は 一番奥の段には置けない) */
+export function flankTargets(state: GameState, pieceId: string): Pos[] {
+  if (state.skillPhase?.type !== 'flank' || flankState(state).placed) return [];
+  const piece = state.hands[state.turn].find((p) => p.id === pieceId);
+  const to = flankSquare(state);
+  if (!piece || !to) return [];
+  if (piece.kind === 'P' && isLastRank(state, state.turn, to)) return [];
+  return [to];
+}
+
 /** 大筒の砲撃: 撃てる相手の駒 (相手の陣 = こちらから見た敵陣にいる、大将以外) */
 export function cannonTargets(state: GameState): Pos[] {
   const side = state.turn;
@@ -300,6 +326,13 @@ export function legalMoves(state: GameState, from: Pos): Pos[] {
         if (piece.kind === 'K') return [];
         moves = slide(state, from, DIAGONALS);
         break;
+      case 'flank': {
+        // 挟み撃ち: ふつうの1手。置いた駒は この手番 動けない
+        const fs = flankState(state);
+        if (fs.acted || piece.id === fs.placed) return [];
+        moves = pseudoMoves(state, from);
+        break;
+      }
       case 'charge': {
         if (!isChargeUnit(state, piece, state.turn)) return [];
         const f = forward(piece.owner);
@@ -317,7 +350,7 @@ export function legalMoves(state: GameState, from: Pos): Pos[] {
 /** 持ち駒を打てるマス */
 export function legalDrops(state: GameState, pieceId: string): Pos[] {
   if (gameOver(state)) return [];
-  if (state.skillPhase && state.skillPhase.type !== 'drop2') return [];
+  if (state.skillPhase && state.skillPhase.type !== 'drop2' && !(state.skillPhase.type === 'flank' && !flankState(state).acted)) return [];
   const piece = state.hands[state.turn].find((p) => p.id === pieceId);
   if (!piece) return [];
   return emptySquares(state).filter(
@@ -407,6 +440,8 @@ export function canActivateSkill(state: GameState): boolean {
       return turncoatTargets(state).length > 0;
     case 'cannon':
       return cannonTargets(state).length > 0;
+    case 'flank':
+      return state.hands[state.turn].some((p) => flankTargets(trial, p.id).length > 0);
     case 'fort':
       return findUnit(state, state.turn) !== null;
     case 'drop2':
@@ -500,7 +535,8 @@ export function applyAction(prev: GameState, action: Action): GameState {
       return state;
     }
     case 'endSkill': {
-      if (!phase || phase.step < 2) fail('nothing to end');
+      // 挟み撃ちは、置く・ふつうの1手の 両方をするまで 終われない
+      if (!phase || phase.step < 2 || phase.type === 'flank') fail('nothing to end');
       endTurn(state);
       return state;
     }
@@ -527,6 +563,18 @@ export function applyAction(prev: GameState, action: Action): GameState {
       piece.owner = side;
       state.events.push({ type: 'turncoat', side, piece: { ...piece }, at: action.at });
       endTurn(state);
+      return state;
+    }
+    case 'flank': {
+      // 挟み撃ち: 持ち駒を 敵の大将の真後ろに置く
+      if (phase?.type !== 'flank') fail('not flank');
+      if (!flankTargets(state, action.pieceId).some((p) => samePos(p, action.to))) fail('illegal flank');
+      commit();
+      const hand = state.hands[side];
+      const [piece] = hand.splice(hand.findIndex((p) => p.id === action.pieceId), 1);
+      state.board[action.to.y][action.to.x] = piece;
+      state.events.push({ type: 'drop', side, pieceId: piece.id, to: action.to });
+      afterFlankStep(state, `placed:${piece.id}`);
       return state;
     }
     case 'bombard': {
@@ -574,6 +622,10 @@ export function applyAction(prev: GameState, action: Action): GameState {
         if (hand.length === 0 || legalDrops(state, hand[0].id).length === 0) endTurn(state);
         return state;
       }
+      if (phase?.type === 'flank') {
+        afterFlankStep(state, 'acted');
+        return state;
+      }
       endTurn(state);
       return state;
     }
@@ -604,6 +656,10 @@ export function applyAction(prev: GameState, action: Action): GameState {
         if (!hasAnySkillMove(state)) endTurn(state);
         return state;
       }
+      if (phase?.type === 'flank') {
+        afterFlankStep(state, 'acted');
+        return state;
+      }
       if (phase?.type === 'arrows') {
         const moved = [...phase.moved, piece.id];
         state.skillPhase = { ...phase, step: moved.length + 1, moved };
@@ -613,6 +669,22 @@ export function applyAction(prev: GameState, action: Action): GameState {
       endTurn(state);
       return state;
     }
+  }
+}
+
+/**
+ * 挟み撃ち: 置く・ふつうの1手 のどちらかが終わったところ。
+ * 両方終わったら手番を終える。残りの一方が もうできなければ、そこで終える
+ */
+function afterFlankStep(state: GameState, done: string) {
+  const phase = state.skillPhase as NonNullable<GameState['skillPhase']>;
+  state.skillPhase = { ...phase, step: 2, moved: [...phase.moved, done] };
+  const fs = flankState(state);
+  if (fs.placed && fs.acted) return endTurn(state);
+  if (!fs.placed && !state.hands[state.turn].some((p) => flankTargets(state, p.id).length > 0)) return endTurn(state);
+  if (!fs.acted) {
+    const canDrop = state.hands[state.turn].some((p) => legalDrops(state, p.id).length > 0);
+    if (!canDrop && !hasAnySkillMove(state)) endTurn(state);
   }
 }
 

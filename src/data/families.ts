@@ -11,7 +11,9 @@ export type ClanId =
   | 'date'
   | 'shimazu'
   | 'chosokabe'
-  | 'sanada';
+  | 'sanada'
+  | 'honganji'
+  | 'asai';
 
 /** 合戦モードの軍 (関ヶ原の東軍・西軍など)。大名家と同じ形のデータで持つ */
 export type ArmyId = 'east' | 'west' | 'winterTokugawa' | 'winterToyotomi' | 'summerTokugawa' | 'summerToyotomi';
@@ -34,6 +36,7 @@ export type FamilyId = ClanId | ArmyId;
  * naiou      持ち駒にいる寝返り候補がいれば、盤上のもう1人を寝返らせる。手番は終わる (東軍)
  * fort       決まった1人 (skill.unit) と まわり8マスの味方は、次の相手の番 取られない。手番を使わない (冬の陣の豊臣方)
  * cannon     相手の陣 (奥2段) にいる駒を1枚、どこからでも取る。大将は取れない (冬の陣の徳川方)
+ * flank      持ち駒1枚を 敵の大将の真後ろに置き (その駒はこの手番 動けない)、別に ふつうの1手もする (浅井)
  */
 export type SkillType =
   | 'shoot'
@@ -49,7 +52,8 @@ export type SkillType =
   | 'charge'
   | 'naiou'
   | 'fort'
-  | 'cannon';
+  | 'cannon'
+  | 'flank';
 
 export interface Family {
   id: FamilyId;
@@ -216,6 +220,27 @@ export const FAMILIES = {
     colors: { main: '#B0201C', border: '#8E1A16', tile: '#FBE3E1', helm: '#B0201C', trim: '#2B2B2B', monFill: GOLD },
   },
 
+  honganji: {
+    id: 'honganji', name: '本願寺家', army: '本願寺勢', lord: '本願寺顕如',
+    gold: ['下間頼廉', '鈴木孫一'], silver: ['下間仲孝', '七里頼周'],
+    skill: {
+      type: 'spawn', name: '一向一揆', phrase: '進まば 極楽!',
+      short: '新しい 足軽を 1まい 盤に 打てる',
+      desc: 'もちごまが なくても、新しい 足軽を 1まい 盤に 打てる (足軽を 打てるマスだけ)',
+    },
+    colors: { main: '#4A3F35', border: '#3E342B', tile: '#EFE9DF', helm: '#3E342B', trim: GOLD, monFill: GOLD },
+  },
+  asai: {
+    id: 'asai', name: '浅井家', army: '浅井軍', lord: '浅井長政',
+    gold: ['磯野員昌', '遠藤直経'], silver: ['赤尾清綱', '海北綱親'],
+    skill: {
+      type: 'flank', name: '挟み撃ち', phrase: 'うしろを 取ったぞ!',
+      short: 'もちごまを 敵の大将の 真後ろに 置き、ふつうの1手も する',
+      desc: 'もちごまを 1まい、敵の大将の 真後ろに 置く (置いた駒は この手番 うごけない)。それとは べつに ふつうの1手 (うごかす・打つ) も する。どちらを 先に しても いい',
+    },
+    colors: { main: '#3E8ED0', border: '#2B6CA8', tile: '#E3F0FB', helm: '#2B6CA8', trim: '#FFFFFF', monFill: '#FFFFFF' },
+  },
+
   // ---- 合戦モード: 関ヶ原 ----
   // じっくり (5×6) の並び: 奥の段は 左から 銀(silver[1])・金(gold[0])・大将・金(gold[1])・銀(silver[0])、足軽の段に先鋒3人
   east: {
@@ -296,6 +321,7 @@ export const FAMILY_IDS: ClanId[] = [
   'oda', 'takeda', 'uesugi', 'toyotomi',
   'tokugawa', 'mori', 'hojo', 'imagawa',
   'date', 'shimazu', 'chosokabe', 'sanada',
+  'honganji', 'asai',
 ];
 
 

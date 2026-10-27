@@ -30,4 +30,7 @@ export const MAP_POINTS: Record<ClanId, { place: string; home: [number, number];
   mori: { place: '安芸', home: [245, 410], icon: [215, 310] },
   chosokabe: { place: '土佐', home: [305, 512], icon: [300, 615] },
   shimazu: { place: '薩摩', home: [135, 595], icon: [215, 625] },
+  // 本願寺 (石山) は大坂城と同じ場所なので、少し北にずらして 日本海側の海にアイコンを置く
+  honganji: { place: '摂津 石山', home: [372, 400], icon: [300, 215] },
+  asai: { place: '近江 小谷', home: [440, 360], icon: [360, 118] },
 };

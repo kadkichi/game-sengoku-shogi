@@ -88,6 +88,26 @@ const MON_PATHS: Record<ClanId | 'east' | 'west', string> = {
   chosokabe: `${ring(7.6, 1.1)} ${kataba(0, 0, 1.55)} ${[0, 60, 120, 180, 240, 300].map((a) => { const [x, y] = at(4.1, a); return kataba(x, y, 1.45); }).join(' ')}`,
   // 六文銭: 四角い穴のあいた銭が 3枚ずつ2段
   sanada: [-5, 0, 5].flatMap((x) => [circle(x, -2.6, 2.2) + ' ' + squareHole(x, -2.6, 0.6), circle(x, 2.6, 2.2) + ' ' + squareHole(x, 2.6, 0.6)]).join(' '),
+  // 下がり藤: 上から左右に垂れる藤の花房が、下で向かい合う
+  honganji: [
+    // 上の葉: 中心から左右へ 弓なりに垂れる
+    'M-0.4 -7.6 Q-7 -7.2 -7.8 -0.6 Q-6 -5.4 -0.4 -5.4 Z M0.4 -7.6 Q7 -7.2 7.8 -0.6 Q6 -5.4 0.4 -5.4 Z',
+    // 花房: 左右から下へ、だんだん小さくなりながら 内側へ垂れる
+    ...[[-6.4, 1.2, 1.6], [-5.5, 3.3, 1.45], [-4.3, 5.0, 1.3], [-2.9, 6.3, 1.1], [-1.5, 7.1, 0.85]].flatMap(([x, y, r]) => [circle(x, y, r), circle(-x, y, r)]),
+    // 内側の小さな葉
+    'M-2.6 -3.6 Q-4.6 -1.6 -3.6 1 Q-2.2 -1.4 -2.6 -3.6 Z M2.6 -3.6 Q4.6 -1.6 3.6 1 Q2.2 -1.4 2.6 -3.6 Z',
+  ].join(' '),
+  // 三つ盛亀甲に花菱: 亀甲 (六角形の輪) を上に1つ・下に2つ。中に小さな花菱
+  asai: [[0, -3.4], [-3.6, 2.8], [3.6, 2.8]]
+    .map(([cx, cy]) => {
+      const hex = (r: number, rev: boolean) => {
+        const pts = [0, 60, 120, 180, 240, 300].map((a) => { const [x, y] = at(r, rev ? -a + 30 : a + 30); return `${(cx + x).toFixed(2)} ${(cy + y).toFixed(2)}`; });
+        return `M${pts.join(' L')} Z`;
+      };
+      const petals = [0, 90, 180, 270].map((a) => { const [x, y] = at(0.9, a); const X = cx + x; const Y = cy + y; return `M${X.toFixed(2)} ${(Y - 0.7).toFixed(2)} L${(X + 0.7).toFixed(2)} ${Y.toFixed(2)} L${X.toFixed(2)} ${(Y + 0.7).toFixed(2)} L${(X - 0.7).toFixed(2)} ${Y.toFixed(2)} Z`; });
+      return `${hex(3.6, false)} ${hex(2.7, true)} ${petals.join(' ')}`;
+    })
+    .join(' '),
   // 東軍: 徳川家康の 三つ葉葵
   east: `${ring(7.6, 1.2)} ${[0, 120, 240].map((a) => heartLeaf(a, 0.6, 6.3, 50)).join(' ')}`,
   // 西軍: 石田三成の 九曜
@@ -295,6 +315,25 @@ function parts(kind: Kind, colorFam: FamilyId, special?: CharaSpecial, look?: Fa
         v.wA = 'M46 14 L78 14 L76 28 L48 28 Z';
         v.wAFill = SILVER;
         v.brows = 'M97 94 Q104 91 112 94 M143 94 Q136 91 128 94';
+        lordFront();
+        break;
+      case 'honganji':
+        // 本願寺顕如: 僧の頭巾と、「念」(念仏) の旗
+        v.wLine = 'M62 150 L62 18';
+        v.wLineColor = WOOD;
+        v.wA = FLAG;
+        v.wAFill = '#FFFFFF';
+        v.flagText = '念';
+        v.helmA = 'M76 138 C66 100 74 52 120 48 C166 52 174 100 164 138 L152 136 C156 112 152 88 120 84 C88 88 84 112 88 136 Z';
+        v.helmFill = C.helm;
+        v.band = '';
+        v.flaps = '';
+        v.brows = 'M98 95 Q105 93 112 95 M142 95 Q135 93 128 95';
+        break;
+      case 'asai':
+        // 浅井長政: 若武者。家紋の旗
+        flag(C.main, C.monFill);
+        v.brows = 'M97 93 L112 96 M143 93 L128 96';
         lordFront();
         break;
       case 'sanada':

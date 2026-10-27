@@ -3,6 +3,8 @@ import {
   applyAction,
   canActivateSkill,
   cannonTargets,
+  flankState,
+  flankTargets,
   turncoatTargets,
   legalDrops,
   legalMoves,
@@ -80,6 +82,16 @@ function expand(state: GameState, start: GameState, prefix: Action[], out: Turn[
     case 'cannon':
       for (const to of cannonTargets(state)) next({ type: 'bombard', to });
       break;
+    case 'flank': {
+      // 挟み撃ち: 置く (持ち駒の種類ごと) と、ふつうの1手 (動かす・相手の近くに打つ) の、まだしていないほう
+      const fs = flankState(state);
+      if (!fs.placed) for (const p of distinctHand(state)) for (const to of flankTargets(state, p.id)) next({ type: 'flank', pieceId: p.id, to });
+      if (!fs.acted) {
+        for (const from of ownPieces(state)) for (const to of legalMoves(state, from)) next({ type: 'move', from, to });
+        for (const p of distinctHand(state)) for (const to of nearEnemy(state, legalDrops(state, p.id))) next({ type: 'drop', pieceId: p.id, to });
+      }
+      break;
+    }
     case 'drop2':
       for (const p of distinctHand(state)) for (const to of nearEnemy(state, legalDrops(state, p.id))) next({ type: 'drop', pieceId: p.id, to });
       break;

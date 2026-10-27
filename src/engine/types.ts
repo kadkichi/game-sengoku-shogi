@@ -32,7 +32,7 @@ export type Cell = Piece | null;
 export interface SkillPhase {
   type: SkillType;
   step: number;
-  /** 三本の矢: もう動かした駒 */
+  /** 三本の矢: もう動かした駒。挟み撃ち: 'placed:<駒の id>' (置いた駒) と 'acted' (ふつうの1手をした) */
   moved: string[];
 }
 
@@ -62,7 +62,8 @@ export type Action =
   | { type: 'pull'; from: Pos; to: Pos }
   | { type: 'spawn'; to: Pos }
   | { type: 'turncoat'; at: Pos }
-  | { type: 'bombard'; to: Pos };
+  | { type: 'bombard'; to: Pos }
+  | { type: 'flank'; pieceId: string; to: Pos };
 
 /** 鳴くまで待とう で戻すための、ある手番の始まりの局面 */
 export type Snapshot = Omit<GameState, 'thisTurnStart' | 'lastTurnStart' | 'events'>;
